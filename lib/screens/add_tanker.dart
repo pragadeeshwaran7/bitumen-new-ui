@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
+import '../core/services/api_config.dart';
+import '../core/services/auth_service.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:mime/mime.dart';
 
@@ -94,10 +96,18 @@ class _AddTankerPageState extends State<AddTankerPage> {
   }
 
   Future<void> addTanker() async {
-    final uri = Uri.parse(
-      'http://10.0.2.2:5000/api/tankers',
-    ); // Replace when backend ready
+    final auth = AuthService();
+    final token = await auth.getToken();
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Not authenticated')),
+      );
+      return;
+    }
+    final url = ApiConfig.getEndpoint('create-tanker');
+    final uri = Uri.parse(url);
     final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(ApiConfig.getHeaders(token: token));
 
     request.fields['supplier_id'] = supplierId;
     request.fields['tanker_number'] = tankerNumberController.text;

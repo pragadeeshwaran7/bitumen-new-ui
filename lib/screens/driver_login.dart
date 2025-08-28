@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../core/services/api_config.dart';
 
 class DriverLogin extends StatefulWidget {
   const DriverLogin({super.key});
@@ -14,12 +15,13 @@ class _DriverLoginState extends State<DriverLogin> {
   final TextEditingController emailController = TextEditingController();
 
   Future<void> sendLoginOtp() async {
-    final uri = Uri.parse('http://10.0.2.2:5000/api/driver/send-otp');
+    final url = ApiConfig.getEndpoint('send-otp');
+    final uri = Uri.parse(url);
     final body = loginMethod == 'phone'
-        ? {'phone': phoneController.text}
-        : {'email': emailController.text};
+        ? {'phoneNumber': phoneController.text}
+        : {'emailAddress': emailController.text};
 
-    final response = await http.post(uri, body: body);
+    final response = await http.post(uri, headers: ApiConfig.getHeaders(), body: body);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

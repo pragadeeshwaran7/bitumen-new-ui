@@ -1,9 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
-import 'package:mime/mime.dart';
+import '../core/services/driver_service.dart';
+import '../shared/models/driver_model.dart';
 
 class AddDriverPage extends StatefulWidget {
   const AddDriverPage({super.key});
@@ -41,43 +40,22 @@ class _AddDriverPageState extends State<AddDriverPage> {
   }
 
   Future<void> addDriver() async {
-    final uri = Uri.parse('http://10.0.2.2:5000/api/drivers'); // update API endpoint later
-    final request = http.MultipartRequest('POST', uri);
+    final driverService = DriverService();
+    final driver = DriverModel(
+      driverId: 'driver_${DateTime.now().millisecondsSinceEpoch}',
+      name: nameController.text.trim(),
+      phone: phoneController.text.trim(),
+    );
 
-    request.fields['name'] = nameController.text;
-    request.fields['phone'] = phoneController.text;
-    request.fields['email'] = emailController.text;
-    request.fields['license_number'] = licenseController.text;
-    request.fields['aadhar_number'] = aadharController.text;
-
-    if (licenseFile != null) {
-      final mimeType = lookupMimeType(licenseFile!.path)!.split('/');
-      request.files.add(await http.MultipartFile.fromPath(
-        'license_document',
-        licenseFile!.path,
-        contentType: MediaType(mimeType[0], mimeType[1]),
-      ));
-    }
-
-    if (aadharFile != null) {
-      final mimeType = lookupMimeType(aadharFile!.path)!.split('/');
-      request.files.add(await http.MultipartFile.fromPath(
-        'aadhar_document',
-        aadharFile!.path,
-        contentType: MediaType(mimeType[0], mimeType[1]),
-      ));
-    }
-
-    final response = await request.send();
-
-    if (response.statusCode == 201) {
+    final result = await driverService.createDriver(driver);
+    if (result.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Driver added successfully")),
       );
       Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to add driver")),
+        SnackBar(content: Text("Failed to add driver: ${result.error}")),
       );
     }
   }

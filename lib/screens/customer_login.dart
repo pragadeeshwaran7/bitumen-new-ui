@@ -1,9 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
-import 'package:mime/mime.dart';
-import 'package:http_parser/http_parser.dart';
+import '../../../core/services/auth_service.dart';
 
 class CustomerLogin extends StatefulWidget {
   const CustomerLogin({super.key});
@@ -20,6 +18,7 @@ class _CustomerLoginState extends State<CustomerLogin> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController nameController = TextEditingController();
   final TextEditingController gstController = TextEditingController();
+  final TextEditingController otpController = TextEditingController();
   File? gstFile;
 
   Future<void> pickGstFile() async {
@@ -30,47 +29,35 @@ class _CustomerLoginState extends State<CustomerLogin> {
       });
     }
   }
-
   Future<void> sendLoginOtp() async {
-    final uri = Uri.parse('http://10.0.2.2:5000/api/customer/send-otp');
-    final body = loginMethod == 'phone'
-        ? {'phone': phoneController.text}
-        : {'email': emailController.text};
+    final auth = AuthService();
+  final phone = phoneController.text;
 
-    final response = await http.post(uri, body: body);
-
-    if (response.statusCode == 200) {
+    final resp = await auth.sendOtp(phoneNumber: phone);
+    if (resp.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('OTP sent successfully')),
+        SnackBar(content: Text(resp.data ?? 'OTP sent')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to send OTP')),
+        SnackBar(content: Text(resp.error ?? 'Failed to send OTP')),
       );
     }
   }
 
   Future<void> registerCustomer() async {
-    final uri = Uri.parse('http://10.0.2.2:5000/api/customer/register');
-    final request = http.MultipartRequest('POST', uri);
+    final auth = AuthService();
 
-    request.fields['name'] = nameController.text;
-    request.fields['phone'] = phoneController.text;
-    request.fields['email'] = emailController.text;
-    request.fields['gst_number'] = gstController.text;
+    final success = await auth.registerCustomer(
+      name: nameController.text,
+      phone: phoneController.text,
+      email: emailController.text,
+      gstNumber: gstController.text,
+  gstFile: gstFile,
+  otp: otpController.text.trim().isEmpty ? null : otpController.text.trim(),
+    );
 
-    if (gstFile != null) {
-      final mimeType = lookupMimeType(gstFile!.path)!.split('/');
-      request.files.add(await http.MultipartFile.fromPath(
-        'gst_certificate',
-        gstFile!.path,
-        contentType: MediaType(mimeType[0], mimeType[1]),
-      ));
-    }
-
-    final response = await request.send();
-
-    if (response.statusCode == 201) {
+    if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Registered successfully')),
       );
@@ -196,6 +183,12 @@ class _CustomerLoginState extends State<CustomerLogin> {
                 controller: emailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(labelText: 'Email'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: otpController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'OTP (if received)'),
               ),
               TextField(
                 controller: gstController,

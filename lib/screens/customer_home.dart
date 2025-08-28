@@ -352,11 +352,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 viewStep = 2; // Assuming success screen step is 1
               });
             },
-            child: const Text('Pay'),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 100, vertical: 16),
               backgroundColor: Colors.red,
             ),
+            child: const Text('Pay'),
           ),
         ),
       ],
@@ -417,11 +417,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 viewStep = -1; // Go back to home step
               });
             },
-            child: const Text('Back to Home'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 14),
             ),
+            child: const Text('Back to Home'),
           ),
         ],
       ),

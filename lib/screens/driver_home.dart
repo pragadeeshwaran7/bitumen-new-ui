@@ -85,8 +85,8 @@ class _DriverHomePageState extends State<DriverHomePage> {
                       children: [
                         const CircleAvatar(
                           backgroundColor: Color(0xFFFCE8E8),
-                          child: Icon(Icons.wallet_giftcard, color: Colors.red),
                           radius: 18,
+                          child: Icon(Icons.wallet_giftcard, color: Colors.red),
                         ),
                         const SizedBox(width: 12),
                         Column(
@@ -128,8 +128,8 @@ class _DriverHomePageState extends State<DriverHomePage> {
                       children: [
                         const CircleAvatar(
                           backgroundColor: Color(0xFFE8F5FE),
-                          child: Icon(Icons.location_on, color: Colors.blue),
                           radius: 18,
+                          child: Icon(Icons.location_on, color: Colors.blue),
                         ),
                         const SizedBox(width: 12),
                         Column(

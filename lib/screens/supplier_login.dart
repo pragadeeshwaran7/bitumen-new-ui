@@ -1,6 +1,7 @@
 //import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import '../core/services/auth_service.dart';
+// import 'package:http/http.dart' as http;
 
 class SupplierLogin extends StatefulWidget {
   const SupplierLogin({super.key});
@@ -18,33 +19,22 @@ class _SupplierLoginState extends State<SupplierLogin> {
   final TextEditingController nameController = TextEditingController();
 
   Future<void> sendLoginOtp() async {
-    final uri = Uri.parse('http://10.0.2.2:5000/api/supplier/send-otp');
-    final body = loginMethod == 'phone'
-        ? {'phone': phoneController.text}
-        : {'email': emailController.text};
-
-    final response = await http.post(uri, body: body);
-
-    if (response.statusCode == 200) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('OTP sent successfully')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to send OTP')),
-      );
-    }
+    final auth = AuthService();
+    final phone = phoneController.text.trim();
+    final result = await auth.sendOtp(phoneNumber: phone);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result.success ? 'OTP sent successfully' : 'Failed to send OTP: ${result.error}')),
+    );
   }
 
   Future<void> registerSupplier() async {
-    final uri = Uri.parse('http://10.0.2.2:5000/api/supplier/register');
-    final response = await http.post(uri, body: {
-      'name': nameController.text,
-      'phone': phoneController.text,
-      'email': emailController.text,
+    final auth = AuthService();
+    final ok = await auth.registerSupplier({
+      'name': nameController.text.trim(),
+      'phone': phoneController.text.trim(),
+      'email': emailController.text.trim(),
     });
-
-    if (response.statusCode == 201) {
+    if (ok) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Registered successfully')),
       );

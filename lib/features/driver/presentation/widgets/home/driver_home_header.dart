@@ -28,8 +28,8 @@ class DriverHomeHeader extends StatelessWidget {
                 children: [
                   const CircleAvatar(
                     backgroundColor: AppColors.background,
-                    child: Icon(Icons.wallet_giftcard, color: AppColors.primaryRed),
                     radius: 18,
+                    child: Icon(Icons.wallet_giftcard, color: AppColors.primaryRed),
                   ),
                   const SizedBox(width: 12),
                   Column(
@@ -58,8 +58,8 @@ class DriverHomeHeader extends StatelessWidget {
                 children: [
                   const CircleAvatar(
                     backgroundColor: AppColors.background,
-                    child: Icon(Icons.location_on, color: Colors.blue),
                     radius: 18,
+                    child: Icon(Icons.location_on, color: Colors.blue),
                   ),
                   const SizedBox(width: 12),
                   Column(
