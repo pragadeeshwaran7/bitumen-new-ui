@@ -4,7 +4,7 @@ import '../../../../../core/constants/app_colors.dart';
 import '../../../../shared/widgets/orders_filter_tabs.dart';
 import '../widgets/orders/order_card.dart';
 import '../widgets/customer_bottom_nav.dart';
-import '../../data/models/customer_order.dart';
+import '../../../../shared/models/order_model.dart'; // Updated import
 import '../../data/services/customer_order_service.dart';
 
 class CustomerOrdersPage extends StatefulWidget {
@@ -17,7 +17,7 @@ class CustomerOrdersPage extends StatefulWidget {
 class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
   String selectedFilter = 'All';
   int selectedIndex = 1;
-  late Future<List<CustomerOrder>> _ordersFuture;
+  late Future<List<OrderModel>> _ordersFuture; // Changed type
 
   @override
   void initState() {
@@ -61,7 +61,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
           ),
           const SizedBox(height: 10),
           Expanded(
-            child: FutureBuilder<List<CustomerOrder>>(
+            child: FutureBuilder<List<OrderModel>>( // Changed type
               future: _ordersFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {

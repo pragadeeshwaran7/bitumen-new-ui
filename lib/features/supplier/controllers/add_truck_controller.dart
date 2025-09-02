@@ -1,30 +1,23 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import '../data/models/tanker_model.dart';
-import '../data/services/tanker_api_service.dart';
+import '../../../core/services/tanker_service.dart';
+import '../../../shared/models/tanker_model.dart'; // Import TankerModel
 
 class AddTruckController {
   final tankerNumberController = TextEditingController();
   final tankerTypeController = TextEditingController();
   final maxCapacityController = TextEditingController();
-  final permissibleLimitController = TextEditingController();
   final rcNumberController = TextEditingController();
   final insuranceNumberController = TextEditingController();
-  final fcNumberController = TextEditingController();
-  final npNumberController = TextEditingController();
 
   DateTime? rcExpiryDate;
   DateTime? insuranceExpiryDate;
-  DateTime? fcExpiryDate;
-  DateTime? npExpiryDate;
 
   File? rcFile;
   File? insuranceFile;
-  File? fcFile;
-  File? npFile;
 
-  Future<DateTime> pickDate(BuildContext context) async {
+  Future<DateTime?> pickDate(BuildContext context) async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -32,7 +25,7 @@ class AddTruckController {
       firstDate: now,
       lastDate: DateTime(now.year + 5),
     );
-    return picked ?? now;
+    return picked;
   }
 
   Future<File?> pickFile() async {
@@ -44,34 +37,61 @@ class AddTruckController {
   }
 
   Future<void> addTanker(BuildContext context) async {
-    if (tankerNumberController.text.isEmpty || rcExpiryDate == null || insuranceExpiryDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill all required fields")),
-      );
+    if (tankerNumberController.text.isEmpty ||
+        tankerTypeController.text.isEmpty ||
+        maxCapacityController.text.isEmpty ||
+        rcNumberController.text.isEmpty ||
+        insuranceNumberController.text.isEmpty ||
+        rcExpiryDate == null ||
+        insuranceExpiryDate == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please fill all required fields")),
+        );
+      }
       return;
     }
 
-    final newTanker = Tanker(
-      tankerNo: tankerNumberController.text,
-      type: tankerTypeController.text,
-      maxQty: maxCapacityController.text,
-      allowedQty: permissibleLimitController.text,
-      rcNo: rcNumberController.text,
-      rcExpiry: rcExpiryDate.toString().split(' ')[0],
-      insuranceNo: insuranceNumberController.text,
-      insuranceExpiry: insuranceExpiryDate.toString().split(' ')[0],
-      status: 'Available',
-      driverAssigned: false,
-      driverName: null,
-      driverPhone: null,
+    final newTanker = TankerModel(
+      supplierId: 'dummy_supplier_id', // TODO: Get actual supplier ID
+      tankerType: tankerTypeController.text,
+      maxCapacity: double.parse(maxCapacityController.text),
+      allowedCapacity: double.parse(maxCapacityController.text), // Assuming allowed is same as max for now
+      rcNumber: rcNumberController.text,
+      insuranceNumber: insuranceNumberController.text,
+      taxExpiry: rcExpiryDate!.toIso8601String(), // Assuming rcExpiryDate is taxExpiry
+      pollutionExpiry: insuranceExpiryDate!.toIso8601String(), // Assuming insuranceExpiryDate is pollutionExpiry
+      vehicleNumber: tankerNumberController.text,
+      // Dummy values for other required fields
+      fcNumber: 'dummy_fc_number',
+      npNumber: 'dummy_np_number',
+      lpNumber: 'dummy_lp_number',
+      status: 'Idle',
     );
 
-    await TankerApiService().addTanker(newTanker);
+    final response = await TankerService().createTanker(newTanker);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Tanker added successfully")),
-    );
+    if (response.success) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Tanker added successfully")),
+        );
+        Navigator.pushReplacementNamed(context, '/supplier-home');
+      }
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(response.error ?? "Failed to add tanker")),
+        );
+      }
+    }
+  }
 
-    Navigator.pushReplacementNamed(context, '/supplier-home');
+  void dispose() {
+    tankerNumberController.dispose();
+    tankerTypeController.dispose();
+    maxCapacityController.dispose();
+    rcNumberController.dispose();
+    insuranceNumberController.dispose();
   }
 }

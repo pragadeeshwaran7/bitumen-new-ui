@@ -4,7 +4,7 @@ import '../widgets/payments/payment_card.dart';
 import '../../../../shared/widgets/payments_filter_tabs.dart';
 import '../widgets/customer_bottom_nav.dart';
 import '../../data/services/customer_payment_service.dart';
-import '../../data/models/customer_payment.dart';
+import '../../../../shared/models/order_model.dart'; // Updated import
 
 class CustomerPaymentsPage extends StatefulWidget {
   const CustomerPaymentsPage({super.key});
@@ -16,7 +16,7 @@ class CustomerPaymentsPage extends StatefulWidget {
 class _CustomerPaymentsPageState extends State<CustomerPaymentsPage> {
   String selectedFilter = 'All';
   int selectedIndex = 2;
-  late Future<List<CustomerPayment>> _paymentsFuture;
+  late Future<List<OrderModel>> _paymentsFuture; // Changed type
 
   @override
   void initState() {
@@ -58,7 +58,7 @@ class _CustomerPaymentsPageState extends State<CustomerPaymentsPage> {
           ),
           const SizedBox(height: 10),
           Expanded(
-            child: FutureBuilder<List<CustomerPayment>>(
+            child: FutureBuilder<List<OrderModel>>( // Changed type
               future: _paymentsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -81,6 +81,7 @@ class _CustomerPaymentsPageState extends State<CustomerPaymentsPage> {
             ),
           )
         ],
+
       ),
       bottomNavigationBar: const CustomerBottomNav(selectedIndex: 2),
     );

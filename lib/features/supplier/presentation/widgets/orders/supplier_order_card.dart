@@ -41,7 +41,7 @@ class SupplierOrderCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
+                  color: statusColor.withAlpha(25),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
@@ -114,7 +114,11 @@ class SupplierOrderCard extends StatelessWidget {
                   if (await canLaunchUrl(phoneUri)) {
                     await launchUrl(phoneUri);
                   } else {
-                    throw 'Could not launch $phoneUri';
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Could not launch $phoneUri')),
+                      );
+                    }
                   }
                 },
                 icon: const Icon(Icons.call),

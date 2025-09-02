@@ -1,23 +1,34 @@
 class AppRoutes {
-  static const welcome = '/';
-  static const customerLogin = '/customer-login';
-  static const customerHome = '/customer-home';
-  static const customerOrders = '/customer-orders';
-  static const customerPayments = '/customer-payments';
-  static const customerTrack = '/customer-track';
-  static const customerAccount = '/customer-account';
+  // Common routes
+  static const String splash = '/splash';
+  static const String welcome = '/';
+  static const String login = '/login';
+  static const String register = '/register';
+  static const String home = '/home';
 
-  static const driverLogin = '/driver-login';
-  static const driverHome = '/driver-home';
-  static const driverOrders = '/driver-orders';
-  static const driverOrderDetails = '/driver-order-details';
+  // Customer routes
+  static const String customerLogin = '/customer/login';
+  static const String customerHome = '/customer/home';
+  static const String customerOrders = '/customer/orders';
+  static const String customerPayments = '/customer/payments';
+  static const String customerTrack = '/customer/track';
+  static const String customerAccount = '/customer/account';
 
-  static const supplierLogin = '/supplier-login';
-  static const supplierHome = '/supplier-home';
-  static const supplierOrders = '/supplier-orders';
-  static const supplierPayments = '/supplier-payments';
-  static const supplierTrack = '/supplier-track';
-  static const supplierAccount = '/supplier-account';
-  static const addTruck = '/add-truck';
-  static const addDriver = '/add-driver';
+  static const String createOrder = '/customer/orders/create';
+
+  // Driver routes
+  static const String driverLogin = '/driver/login';
+  static const String driverHome = '/driver/home';
+  static const String driverOrders = '/driver/orders';
+  static const String driverOrderDetails = '/driver/orders/details';
+
+  // Supplier routes
+  static const String supplierLogin = '/supplier/login';
+  static const String supplierHome = '/supplier/home';
+  static const String supplierOrders = '/supplier/orders';
+  static const String supplierPayments = '/supplier/payments';
+  static const String supplierTrack = '/supplier/track';
+  static const String supplierAccount = '/supplier/account';
+  static const String addTruck = '/supplier/trucks/add';
+  static const String addDriver = '/supplier/drivers/add';
 }

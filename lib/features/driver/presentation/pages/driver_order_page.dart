@@ -37,6 +37,7 @@ class _DriverOrderPageState extends State<DriverOrderPage> {
     if (picked != null) {
       setState(() => billImage = File(picked.path));
       await DriverOrderApiService().uploadBill(billImage!);
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("Mock Bill Uploaded")));
@@ -57,9 +58,10 @@ class _DriverOrderPageState extends State<DriverOrderPage> {
       });
 
       if (type == 'drop') {
-        await DriverOrderApiService().completeDriverOrder(orderId);
+        // await DriverOrderApiService().completeDriverOrder(orderId);
       }
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -68,6 +70,7 @@ class _DriverOrderPageState extends State<DriverOrderPage> {
         ),
       );
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("Invalid OTP")));

@@ -29,8 +29,6 @@ class _AddTruckFormState extends State<AddTruckForm> {
         TruckInputField("Tanker Number", controller.tankerNumberController),
         TruckInputField("Tanker Type", controller.tankerTypeController),
         TruckInputField("Maximum Capacity", controller.maxCapacityController),
-        TruckInputField("Permissible Limit (as per standards)",
-            controller.permissibleLimitController),
         TruckInputField("RC Number", controller.rcNumberController),
 
         TruckDatePicker(
@@ -65,42 +63,6 @@ class _AddTruckFormState extends State<AddTruckForm> {
           onPressed: () async {
             final file = await controller.pickFile();
             setState(() => controller.insuranceFile = file);
-          },
-        ),
-
-        TruckInputField("FC Number", controller.fcNumberController),
-        TruckDatePicker(
-          label: "FC Expiry Date",
-          date: controller.fcExpiryDate,
-          onTap: () async {
-            final picked = await controller.pickDate(context);
-            setState(() => controller.fcExpiryDate = picked);
-          },
-        ),
-        TruckFileUpload(
-          label: "Upload FC Document",
-          file: controller.fcFile,
-          onPressed: () async {
-            final file = await controller.pickFile();
-            setState(() => controller.fcFile = file);
-          },
-        ),
-
-        TruckInputField("National Permit Number", controller.npNumberController),
-        TruckDatePicker(
-          label: "National Permit Expiry Date",
-          date: controller.npExpiryDate,
-          onTap: () async {
-            final picked = await controller.pickDate(context);
-            setState(() => controller.npExpiryDate = picked);
-          },
-        ),
-        TruckFileUpload(
-          label: "Upload National Permit Document",
-          file: controller.npFile,
-          onPressed: () async {
-            final file = await controller.pickFile();
-            setState(() => controller.npFile = file);
           },
         ),
 

@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '../widgets/home/initial_view.dart';
 import '../widgets/home/booking_view.dart';
 import '../widgets/home/payment_view.dart';
 import '../widgets/home/success_view.dart';
 import '../widgets/customer_bottom_nav.dart';
-import '../../data/models/customer_booking.dart';
-import '../../data/services/customer_booking_service.dart';
+import '../../../../shared/models/order_model.dart';
+import '../../data/services/customer_order_service.dart';
 
 class CustomerHomePage extends StatefulWidget {
   const CustomerHomePage({super.key});
@@ -45,7 +44,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     "PMB", "CRMB", "VG30", "VG40", "RS1", "RS2", "SS1", "SS2", "MR"
   ];
 
-  CustomerBooking? lastOrder;
+  OrderModel? lastOrder;
 
   int calculateTotal() => (trucks[selectedTanker]!["rate"] as int) * totalDistance;
   int calculateAdvance() => (calculateTotal() * 0.75).round();
@@ -53,28 +52,28 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   void proceedToPayment() => setState(() => viewStep = 1);
 
   void makePayment() async {
-    final order = CustomerBooking(
-      id: const Uuid().v4(),
-      tankerType: selectedTanker,
-      goods: selectedGoods,
-      loadingQty: loadingQty,
-      unloadingQty: unloadingQty,
-      pickup: pickupController.text,
-      drop: dropController.text,
+    final order = OrderModel(
+      pickupLocation: pickupController.text,
+      dropLocation: dropController.text,
+      pickupDate: DateTime.now(), // You may want to use a real date picker
+      dropDate: DateTime.now(),   // You may want to use a real date picker
       receiverName: receiverNameController.text,
       receiverPhone: receiverPhoneController.text,
       receiverEmail: receiverEmailController.text,
-      distance: totalDistance,
-      ratePerKm: ratePerKm,
+      goodsType: selectedGoods,
+      quantityAtLoading: loadingQty.toDouble(),
+      quantityAtUnloading: unloadingQty.toDouble(),
+      tankerType: selectedTanker,
+      distance: totalDistance.toDouble(),
+      ratePerKm: ratePerKm.toDouble(),
       paymentMethod: selectedPaymentMethod,
-      totalAmount: calculateTotal(),
-      advanceAmount: calculateAdvance(),
-      balanceAmount: calculateTotal() - calculateAdvance(),
+      totalAmount: calculateTotal().toDouble(),
+      advanceAmount: calculateAdvance().toDouble(),
+      balanceAmount: (calculateTotal() - calculateAdvance()).toDouble(),
       status: "Confirmed",
-      date: DateTime.now(),
     );
 
-    await CustomerApiService().placeOrder(order);
+    await CustomerApiService().createOrder(order);
     setState(() {
       lastOrder = order;
       viewStep = 2;
@@ -137,10 +136,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                   onConfirm: makePayment,
                   onPay: () => setState(() => viewStep = 2),
                 ),
-         2 => SuccessView(
+         2 => lastOrder != null
+              ? SuccessView(
                   order: lastOrder!,
                   onBackToHome: () => setState(() => viewStep = -1),
-               ),
+               )
+              : Center(child: Text('No order found.')),
          _ => Container(),
       },
       bottomNavigationBar: const CustomerBottomNav(selectedIndex: 0),

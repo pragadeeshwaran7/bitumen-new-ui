@@ -25,8 +25,27 @@ class _SupplierRegistrationFormState extends State<SupplierRegistrationForm> {
   final _gstController = TextEditingController();
   final _addressController = TextEditingController();
   final _contactPersonController = TextEditingController();
-  File? _selectedGstFile;
+  final _otpController = TextEditingController();
   
+  File? _selectedGstFile;
+  final AuthService _authService = AuthService();
+  
+  bool _isLoading = false;
+  bool _isOtpSent = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _companyNameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
+    _gstController.dispose();
+    _addressController.dispose();
+    _contactPersonController.dispose();
+    _otpController.dispose();
+    super.dispose();
+  }
+
   Future<void> _pickGstFile() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -48,73 +67,127 @@ class _SupplierRegistrationFormState extends State<SupplierRegistrationForm> {
       }
     }
   }
-  
-  final AuthService _authService = AuthService();
-  
-  bool _isLoading = false;
-  String? _errorMessage;
 
-  @override
-  void dispose() {
-    _companyNameController.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
-    _gstController.dispose();
-    _addressController.dispose();
-    _contactPersonController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _registerSupplier() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _sendOtp() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty || !RegExp(r'^[0-9]{10}$').hasMatch(phone)) {
+      setState(() {
+        _errorMessage = 'Please enter a valid 10-digit phone number';
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a valid 10-digit phone number'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
 
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
-    developer.log('🚀 Registering supplier: ${_companyNameController.text}', name: 'SupplierRegistration');
+    developer.log('🚀 Sending OTP for supplier registration to: $phone', name: 'SupplierRegistration');
+
+    final response = await _authService.sendOtp(phoneNumber: phone);
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (response.success) {
+      setState(() {
+        _isOtpSent = true;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response.data ?? 'OTP sent successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else {
+      setState(() {
+        _errorMessage = response.error;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response.error ?? 'Failed to send OTP'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  Future<void> _registerSupplier() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (!_isOtpSent) {
+      setState(() {
+        _errorMessage = 'Please send OTP first';
+      });
+      return;
+    }
+
+    final otp = _otpController.text.trim();
+    if (otp.isEmpty || otp.length != 6) {
+      setState(() {
+        _errorMessage = 'Please enter the 6-digit OTP';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    developer.log('🚀 Registering supplier...', name: 'SupplierRegistration');
 
     try {
-      final supplierData = {
-        'companyName': _companyNameController.text.trim(),
-        'phoneNumber': _phoneController.text.trim(),
-        'emailAddress': _emailController.text.trim(),
-        'gstNumber': _gstController.text.trim(),
-        'address': _addressController.text.trim(),
-        'contactPerson': _contactPersonController.text.trim(),
-        'role': 'supplier',
-      };
-
-      final success = await _authService.registerSupplier(supplierData, gstFile: _selectedGstFile);
+      final response = await _authService.registerWithOtp(
+        phoneNumber: _phoneController.text.trim(),
+        emailAddress: _emailController.text.trim(),
+        role: 'supplier',
+        otp: otp,
+      );
 
       setState(() {
         _isLoading = false;
       });
 
-      if (success) {
+      if (response.success) {
         developer.log('✅ Supplier registration successful', name: 'SupplierRegistration');
+        
+        // Save additional supplier details to profile
+        final user = response.data;
+        developer.log('User data: ${user.toString()}', name: 'SupplierRegistration');
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Registration successful! Please login.'),
+              content: Text('Registration successful! Redirecting to home...'),
               backgroundColor: Colors.green,
             ),
           );
           
-          // Call the callback to switch to login mode
-          widget.onRegistered();
+          // Navigate directly to supplier home screen
+          Navigator.of(context).pushNamedAndRemoveUntil('/supplier/home', (route) => false);
         }
       } else {
         setState(() {
-          _errorMessage = 'Registration failed. Please try again.';
+          _errorMessage = response.error ?? 'Registration failed. Please try again.';
         });
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Registration failed. Please try again.'),
+            SnackBar(
+              content: Text(response.error ?? 'Registration failed. Please try again.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -158,7 +231,7 @@ class _SupplierRegistrationFormState extends State<SupplierRegistrationForm> {
           // Company Name Field
           TextFormField(
             controller: _companyNameController,
-            enabled: !_isLoading,
+            enabled: !_isLoading && !_isOtpSent,
             decoration: const InputDecoration(
               labelText: 'Company Name',
               hintText: 'Enter company name',
@@ -180,7 +253,7 @@ class _SupplierRegistrationFormState extends State<SupplierRegistrationForm> {
           // Contact Person Field
           TextFormField(
             controller: _contactPersonController,
-            enabled: !_isLoading,
+            enabled: !_isLoading && !_isOtpSent,
             decoration: const InputDecoration(
               labelText: 'Contact Person',
               hintText: 'Enter contact person name',
@@ -200,7 +273,7 @@ class _SupplierRegistrationFormState extends State<SupplierRegistrationForm> {
           TextFormField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
-            enabled: !_isLoading,
+            enabled: !_isLoading && !_isOtpSent,
             decoration: const InputDecoration(
               labelText: 'Phone Number',
               hintText: 'Enter 10-digit phone number',
@@ -223,7 +296,7 @@ class _SupplierRegistrationFormState extends State<SupplierRegistrationForm> {
           TextFormField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
-            enabled: !_isLoading,
+            enabled: !_isLoading && !_isOtpSent,
             decoration: const InputDecoration(
               labelText: 'Email Address',
               hintText: 'Enter company email',
@@ -245,7 +318,7 @@ class _SupplierRegistrationFormState extends State<SupplierRegistrationForm> {
           // GST Number Field
           TextFormField(
             controller: _gstController,
-            enabled: !_isLoading,
+            enabled: !_isLoading && !_isOtpSent,
             decoration: const InputDecoration(
               labelText: 'GST Number',
               hintText: 'Enter GST number',
@@ -263,6 +336,58 @@ class _SupplierRegistrationFormState extends State<SupplierRegistrationForm> {
             },
           ),
           const SizedBox(height: 16),
+
+          // Send OTP Button (shown only before OTP is sent)
+          if (!_isOtpSent) ...[
+            ElevatedButton(
+              onPressed: _isLoading ? null : _sendOtp,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryRed,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Send OTP'),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // OTP Field (shown only after OTP is sent)
+          if (_isOtpSent) ...[
+            TextFormField(
+              controller: _otpController,
+              keyboardType: TextInputType.number,
+              enabled: !_isLoading,
+              decoration: const InputDecoration(
+                labelText: 'OTP',
+                hintText: 'Enter 6-digit OTP',
+                prefixIcon: Icon(Icons.lock),
+                border: OutlineInputBorder(),
+              ),
+              maxLength: 6,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter the OTP';
+                }
+                if (value.length != 6) {
+                  return 'OTP must be 6 digits';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // GST File Upload (optional)
           Container(
@@ -288,7 +413,7 @@ class _SupplierRegistrationFormState extends State<SupplierRegistrationForm> {
           TextFormField(
             controller: _addressController,
             maxLines: 3,
-            enabled: !_isLoading,
+            enabled: !_isLoading && !_isOtpSent,
             decoration: const InputDecoration(
               labelText: 'Business Address',
               hintText: 'Enter complete business address',
@@ -322,28 +447,30 @@ class _SupplierRegistrationFormState extends State<SupplierRegistrationForm> {
             const SizedBox(height: 16),
           ],
 
-          // Register Button
-          ElevatedButton(
-            onPressed: _isLoading ? null : _registerSupplier,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryRed,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          // Register Button (shown only after OTP is sent)
+          if (_isOtpSent) ...[
+            ElevatedButton(
+              onPressed: _isLoading ? null : _registerSupplier,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryRed,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Create Account'),
             ),
-            child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Text('Create Account'),
-          ),
+          ],
 
           const SizedBox(height: 16),
           Text(

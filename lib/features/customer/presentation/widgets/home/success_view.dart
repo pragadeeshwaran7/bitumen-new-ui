@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../../../core/constants/app_colors.dart';
-import '../../../data/models/customer_booking.dart';
+import '../../../../../shared/models/order_model.dart'; // Updated import
 
 class SuccessView extends StatelessWidget {
-  final CustomerBooking order;
+  final OrderModel order; // Changed type
   final VoidCallback onBackToHome;
 
   const SuccessView({
@@ -38,15 +38,15 @@ class SuccessView extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _row("Tanker Type", order.tankerType),
-                    _row("Goods", order.goods),
-                    _row("Pickup", order.pickup),
-                    _row("Drop", order.drop),
-                    _row("Distance", "${order.distance} km"),
-                    _row("Total", "₹${order.totalAmount}"),
-                    _row("Advance", "₹${order.advanceAmount}"),
-                    _row("Balance", "₹${order.balanceAmount}"),
-                    _row("Status", order.status),
+                    _row("Tanker Type", order.tankerType!), // Reverted to !
+                    _row("Goods", order.goodsType!), // Reverted to !
+                    _row("Pickup", order.pickupLocation),
+                    _row("Drop", order.dropLocation),
+                    _row("Distance", "${order.distance?.toStringAsFixed(0)} km"),
+                    _row("Total", "₹${order.totalAmount?.toStringAsFixed(0)}"),
+                    _row("Advance", "₹${order.advanceAmount?.toStringAsFixed(0)}"),
+                    _row("Balance", "₹${order.balanceAmount?.toStringAsFixed(0)}"),
+                    _row("Status", order.status!), // Reverted to !
                   ],
                 ),
               ),

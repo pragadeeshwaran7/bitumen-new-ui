@@ -1,4 +1,7 @@
+import 'package:bitumen_hub/core/models/order_model.dart';
+import 'package:bitumen_hub/core/services/order_service.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class DriverHomePage extends StatefulWidget {
   const DriverHomePage({super.key});
@@ -9,38 +12,40 @@ class DriverHomePage extends StatefulWidget {
 
 class _DriverHomePageState extends State<DriverHomePage> {
   String selectedTab = 'New Orders';
+  List<Order> _orders = [];
+  bool _isLoading = true;
 
-  // Placeholder list (replace with data from MongoDB API)
-  final List<Map<String, dynamic>> orders = [
-    {
-      'orderId': 'ORD2001',
-      'date': '20 Nov 2023',
-      'pickup': 'Vashi, Navi Mumbai',
-      'drop': 'Panvel, Raigad',
-      'bitumen': 'VG40',
-      'quantity': '20 Tons',
-      'distance': '32 km',
-      'status': 'Pending',
-    },
-    {
-      'orderId': 'ORD2002',
-      'date': '20 Nov 2023',
-      'pickup': 'Airoli, Navi Mumbai',
-      'drop': 'Kalamboli, Raigad',
-      'bitumen': 'VG30',
-      'quantity': '25 Tons',
-      'distance': '28 km',
-      'status': 'Pending',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchOrders();
+  }
 
-  List<Map<String, dynamic>> getFilteredOrders() {
+  Future<void> _fetchOrders() async {
+    final orderService = Provider.of<OrderService>(context, listen: false);
+    final response = await orderService.getAssignedOrders();
+    if (response.success) {
+      setState(() {
+        _orders = response.data!;
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(response.error ?? 'Failed to fetch orders')),
+      );
+    }
+  }
+
+  List<Order> getFilteredOrders() {
     if (selectedTab == 'New Orders') {
-      return orders.where((o) => o['status'] == 'Pending').toList();
+      return _orders.where((o) => o.status == OrderStatus.pending).toList();
     } else if (selectedTab == 'Active') {
-      return orders.where((o) => o['status'] == 'In Transit').toList();
+      return _orders.where((o) => o.status == OrderStatus.inTransit).toList();
     } else if (selectedTab == 'Completed') {
-      return orders.where((o) => o['status'] == 'Completed').toList();
+      return _orders.where((o) => o.status == OrderStatus.delivered).toList();
     }
     return [];
   }
@@ -66,7 +71,6 @@ class _DriverHomePageState extends State<DriverHomePage> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 🔽 Added Incentives and Distance Covered Cards
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
@@ -159,7 +163,6 @@ class _DriverHomePageState extends State<DriverHomePage> {
               ],
             ),
           ),
-          // Tabs
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
@@ -189,110 +192,110 @@ class _DriverHomePageState extends State<DriverHomePage> {
                   }).toList(),
             ),
           ),
-
-          // Order Cards
           Expanded(
-            child: ListView.builder(
-              itemCount: filteredOrders.length,
-              itemBuilder: (context, index) {
-                final order = filteredOrders[index];
-                return Container(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black12, blurRadius: 4),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Order #${order['orderId']}",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    itemCount: filteredOrders.length,
+                    itemBuilder: (context, index) {
+                      final order = filteredOrders[index];
+                      return Container(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black12, blurRadius: 4),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  "Order #${order.id}",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade100,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Text(
+                                    order.status.toString().split('.').last,
+                                    style: const TextStyle(
+                                      color: Colors.orange,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
+                            const SizedBox(height: 6),
+                            Text(
+                              order.createdAt.toString(),
+                              style: const TextStyle(color: Colors.grey),
                             ),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade100,
-                              borderRadius: BorderRadius.circular(16),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Icon(Icons.circle, size: 10, color: Colors.red),
+                                const SizedBox(width: 6),
+                                Expanded(child: Text(order.pickupLocation)),
+                                const Icon(Icons.arrow_forward),
+                                const SizedBox(width: 6),
+                                const Icon(
+                                  Icons.circle,
+                                  size: 10,
+                                  color: Colors.yellow,
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(child: Text(order.dropoffLocation)),
+                              ],
                             ),
-                            child: const Text(
-                              "Pending",
-                              style: TextStyle(
-                                color: Colors.orange,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                buildLabelValue("Bitumen", order.product),
+                                buildLabelValue("Quantity", "${order.quantity} Tons"),
+                                buildLabelValue("Distance", "N/A"),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pushNamed(context, '/driver-order');
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                  minimumSize: const Size(130, 40),
+                                ),
+                                child: const Text("Accept Order"),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        order['date'],
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const Icon(Icons.circle, size: 10, color: Colors.red),
-                          const SizedBox(width: 6),
-                          Expanded(child: Text(order['pickup'])),
-                          const Icon(Icons.arrow_forward),
-                          const SizedBox(width: 6),
-                          const Icon(
-                            Icons.circle,
-                            size: 10,
-                            color: Colors.yellow,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(child: Text(order['drop'])),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          buildLabelValue("Bitumen", order['bitumen']),
-                          buildLabelValue("Quantity", order['quantity']),
-                          buildLabelValue("Distance", order['distance']),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.pushNamed(context, '/driver-order');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(130, 40),
-                          ),
-                          child: const Text("Accept Order"),
+                          ],
                         ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),

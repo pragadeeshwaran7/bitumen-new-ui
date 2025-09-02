@@ -2,11 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:http/http.dart' as http;
-import '../core/services/api_config.dart';
-import '../core/services/auth_service.dart';
-import 'package:http_parser/http_parser.dart';
-import 'package:mime/mime.dart';
+import '../core/services/tanker_service.dart';
+import '../shared/models/tanker_model.dart'; // Import TankerModel
 
 class AddTankerPage extends StatefulWidget {
   const AddTankerPage({super.key});
@@ -19,26 +16,25 @@ class _AddTankerPageState extends State<AddTankerPage> {
   final TextEditingController tankerNumberController = TextEditingController();
   final TextEditingController tankerTypeController = TextEditingController();
   final TextEditingController maxCapacityController = TextEditingController();
-  final TextEditingController permissibleLimitController =
-      TextEditingController();
   final TextEditingController rcNumberController = TextEditingController();
   final TextEditingController insuranceNumberController =
       TextEditingController();
-  final TextEditingController fcNumberController = TextEditingController();
-  final TextEditingController npNumberController = TextEditingController();
 
   DateTime? rcExpiryDate;
   DateTime? insuranceExpiryDate;
-  DateTime? fcExpiryDate;
-  DateTime? npExpiryDate;
 
   File? rcFile;
   File? insuranceFile;
-  File? fcFile;
-  File? npFile;
 
-  final String supplierId = '682d5711189f527b226c4bef';
-  final String driverId = '682d5711189f527b226c4bf0';
+  @override
+  void dispose() {
+    tankerNumberController.dispose();
+    tankerTypeController.dispose();
+    maxCapacityController.dispose();
+    rcNumberController.dispose();
+    insuranceNumberController.dispose();
+    super.dispose();
+  }
 
   Future<void> pickRCFile() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
@@ -54,24 +50,6 @@ class _AddTankerPageState extends State<AddTankerPage> {
     if (picked != null) {
       setState(() {
         insuranceFile = File(picked.path);
-      });
-    }
-  }
-
-  Future<void> pickFCFile() async {
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      setState(() {
-        fcFile = File(picked.path);
-      });
-    }
-  }
-
-  Future<void> pickNPFile() async {
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      setState(() {
-        npFile = File(picked.path);
       });
     }
   }
@@ -96,101 +74,42 @@ class _AddTankerPageState extends State<AddTankerPage> {
   }
 
   Future<void> addTanker() async {
-    final auth = AuthService();
-    final token = await auth.getToken();
-    if (token == null) {
+    final tankerService = TankerService();
+    final tanker = TankerModel(
+      supplierId: 'dummy_supplier_id', // TODO: Get actual supplier ID
+      tankerType: tankerTypeController.text.trim(),
+      maxCapacity: double.tryParse(maxCapacityController.text.trim()) ?? 0.0,
+      allowedCapacity: double.tryParse(maxCapacityController.text.trim()) ?? 0.0, // Assuming allowed is same as max for now
+      rcNumber: rcNumberController.text.trim(),
+      insuranceNumber: insuranceNumberController.text.trim(),
+      taxExpiry: rcExpiryDate?.toIso8601String(), // Optional
+      pollutionExpiry: insuranceExpiryDate?.toIso8601String(), // Optional
+      vehicleNumber: tankerNumberController.text.trim(),
+      // Dummy values for other required fields
+      fcNumber: 'dummy_fc_number',
+      npNumber: 'dummy_np_number',
+      lpNumber: 'dummy_lp_number',
+      status: 'Idle',
+    );
+
+    final result = await tankerService.createTanker(tanker);
+    if (!mounted) return;
+    if (result.success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Not authenticated')),
+        const SnackBar(content: Text("Tanker added successfully")),
       );
-      return;
-    }
-    final url = ApiConfig.getEndpoint('create-tanker');
-    final uri = Uri.parse(url);
-    final request = http.MultipartRequest('POST', uri);
-    request.headers.addAll(ApiConfig.getHeaders(token: token));
-
-    request.fields['supplier_id'] = supplierId;
-    request.fields['tanker_number'] = tankerNumberController.text;
-    request.fields['tanker_type'] = tankerTypeController.text;
-    request.fields['max_capacity'] = maxCapacityController.text;
-    request.fields['permissible_limit'] = permissibleLimitController.text;
-    request.fields['rc_number'] = rcNumberController.text;
-    request.fields['rc_expiry'] = rcExpiryDate?.toIso8601String() ?? '';
-    request.fields['insurance_number'] = insuranceNumberController.text;
-    request.fields['insurance_expiry'] =
-        insuranceExpiryDate?.toIso8601String() ?? '';
-    request.fields['fc_number'] = fcNumberController.text;
-    request.fields['fc_expiry'] = fcExpiryDate?.toIso8601String() ?? '';
-    request.fields['np_number'] = npNumberController.text;
-    request.fields['np_expiry'] = npExpiryDate?.toIso8601String() ?? '';
-    request.fields['visible_to_customer'] = 'true';
-    request.fields['status'] = 'Available';
-    request.fields['driver_id'] = driverId;
-    request.fields['location.lat'] = '';
-    request.fields['location.lng'] = '';
-
-    if (rcFile != null) {
-      final mimeType = lookupMimeType(rcFile!.path)!.split('/');
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'rc_document',
-          rcFile!.path,
-          contentType: MediaType(mimeType[0], mimeType[1]),
-        ),
-      );
-    }
-
-    if (insuranceFile != null) {
-      final mimeType = lookupMimeType(insuranceFile!.path)!.split('/');
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'insurance_document',
-          insuranceFile!.path,
-          contentType: MediaType(mimeType[0], mimeType[1]),
-        ),
-      );
-    }
-
-    if (fcFile != null) {
-      final mimeType = lookupMimeType(fcFile!.path)!.split('/');
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'fc_document',
-          fcFile!.path,
-          contentType: MediaType(mimeType[0], mimeType[1]),
-        ),
-      );
-    }
-
-    if (npFile != null) {
-      final mimeType = lookupMimeType(npFile!.path)!.split('/');
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'np_document',
-          npFile!.path,
-          contentType: MediaType(mimeType[0], mimeType[1]),
-        ),
-      );
-    }
-
-    final response = await request.send();
-
-    if (response.statusCode == 201) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Tanker added successfully")));
       Navigator.pop(context);
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Failed to add tanker")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to add tanker: ${result.error}")),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Add Tanker"), leading: BackButton()),
+      appBar: AppBar(title: const Text("Add Tanker"), leading: const BackButton()),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -205,10 +124,6 @@ class _AddTankerPageState extends State<AddTankerPage> {
             buildInput("Tanker Number", tankerNumberController),
             buildInput("Tanker Type", tankerTypeController),
             buildInput("Maximum Capacity", maxCapacityController),
-            buildInput(
-              "Permissible Limit (as per standards)",
-              permissibleLimitController,
-            ),
             buildInput("RC Number", rcNumberController),
 
             buildDateSelector(
@@ -228,25 +143,6 @@ class _AddTankerPageState extends State<AddTankerPage> {
               "Upload Insurance Document",
               insuranceFile,
               pickInsuranceFile,
-            ),
-            buildInput("FC Number", fcNumberController),
-            buildDateSelector(
-              "FC Expiry Date",
-              fcExpiryDate,
-              () => pickDate(context, false),
-            ),
-            buildFileUpload("Upload FC Document", fcFile, pickFCFile),
-
-            buildInput("National Permit Number", npNumberController),
-            buildDateSelector(
-              "National Permit Expiry Date",
-              npExpiryDate,
-              () => pickDate(context, false),
-            ),
-            buildFileUpload(
-              "Upload National Permit Document",
-              npFile,
-              pickNPFile,
             ),
 
             const SizedBox(height: 20),

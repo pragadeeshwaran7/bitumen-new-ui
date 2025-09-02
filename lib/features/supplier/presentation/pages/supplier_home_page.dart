@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../../../core/constants/app_colors.dart';
 import '/shared/widgets/loading_widget.dart';
-import '../../data/models/tanker_model.dart';
 import '/shared/models/supplier_model.dart';
-import '../../data/services/tanker_api_service.dart';
+import '../../../../../core/services/tanker_service.dart';
+import '../../../../shared/models/tanker_model.dart'; // Updated import
 import '../widgets/home/tanker_card.dart';
 import '../widgets/home/assign_driver_modal.dart';
 import '../widgets/home/top_tab_selector.dart';
@@ -20,7 +20,7 @@ class _SupplierHomePageState extends State<SupplierHomePage> {
   int selectedIndex = 0;
   String selectedTab = "Available Tankers";
 
-  List<Tanker> tankerList = [];
+  List<TankerModel> tankerList = [];
   SupplierModel? supplier;
 
   @override
@@ -30,21 +30,25 @@ class _SupplierHomePageState extends State<SupplierHomePage> {
   }
 
   Future<void> loadInitialData() async {
-    final profile = await TankerApiService().fetchSupplierProfile();
-    final data = await TankerApiService().fetchTankers();
-    setState(() {
-      supplier = profile;
-      tankerList = data;
-    });
+    // Temporary welcome until supplier profile endpoint is available
+    supplier = SupplierModel(supplierId: '', name: 'Supplier');
+    final resp = await TankerService().getTankers();
+    if (mounted) {
+      setState(() {
+        tankerList = resp.data ?? [];
+      });
+    }
   }
 
-  void assignDriver(Tanker tanker) {
+  void assignDriver(TankerModel tanker) {
     showModalBottomSheet(
       context: context,
       builder: (_) => AssignDriverModal(
         onSelect: (driver) async {
-          await TankerApiService().assignDriver(tanker.tankerNo, driver['name']!, driver['phone']!);
-          loadInitialData();
+          if (tanker.id != null) {
+            await TankerService().assignDriver(tankerId: tanker.id!, driverId: driver.id!); // Changed driver.driverId to driver.id!
+            await loadInitialData();
+          }
         },
       ),
     );
@@ -55,10 +59,10 @@ class _SupplierHomePageState extends State<SupplierHomePage> {
     if (supplier == null) {
     return const LoadingWidget();
   }
-    List<Tanker> filteredTankers = tankerList.where((t) {
-      if (selectedTab == "Available Tankers") return t.status == 'Available';
-      if (selectedTab == "Active Tankers") return t.status == 'In Transit';
-      if (selectedTab == "Disabled Tankers") return t.status == 'In Service';
+    List<TankerModel> filteredTankers = tankerList.where((t) {
+      if (selectedTab == "Available Tankers") return t.status == 'Idle'; // Changed status
+      if (selectedTab == "Active Tankers") return t.status == 'In Transit'; // Changed status
+      if (selectedTab == "Disabled Tankers") return t.status == 'Under Maintenance'; // Changed status
       return false;
     }).toList();
 
@@ -98,16 +102,54 @@ class _SupplierHomePageState extends State<SupplierHomePage> {
               itemBuilder: (context, index) {
                 final tanker = filteredTankers[index];
                 return TankerCard(
-                  tanker: tanker.toJson(),
+                  tanker: tanker,
                   selectedTab: selectedTab,
                   onAssignDriver: () => assignDriver(tanker),
                   onEnable: () async {
-                    await TankerApiService().updateStatus(tanker.tankerNo, 'Available');
-                    loadInitialData();
+                    if (tanker.id != null) {
+                      await TankerService().updateTanker(
+                        tanker.id!,
+                        TankerModel(
+                          supplierId: tanker.supplierId!, // Reverted to !
+                          tankerType: tanker.tankerType,
+                          maxCapacity: tanker.maxCapacity,
+                          allowedCapacity: tanker.allowedCapacity,
+                          rcNumber: tanker.rcNumber,
+                          insuranceNumber: tanker.insuranceNumber,
+                          fcNumber: tanker.fcNumber,
+                          npNumber: tanker.npNumber,
+                          lpNumber: tanker.lpNumber,
+                          taxExpiry: tanker.taxExpiry,
+                          pollutionExpiry: tanker.pollutionExpiry,
+                          vehicleNumber: tanker.vehicleNumber,
+                          status: 'Idle', // Changed status
+                        ),
+                      );
+                      await loadInitialData();
+                    }
                   },
                   onDisable: () async {
-                    await TankerApiService().updateStatus(tanker.tankerNo, 'In Service');
-                    loadInitialData();
+                    if (tanker.id != null) {
+                      await TankerService().updateTanker(
+                        tanker.id!,
+                        TankerModel(
+                          supplierId: tanker.supplierId!, // Reverted to !
+                          tankerType: tanker.tankerType,
+                          maxCapacity: tanker.maxCapacity,
+                          allowedCapacity: tanker.allowedCapacity,
+                          rcNumber: tanker.rcNumber,
+                          insuranceNumber: tanker.insuranceNumber,
+                          fcNumber: tanker.fcNumber,
+                          npNumber: tanker.npNumber,
+                          lpNumber: tanker.lpNumber,
+                          taxExpiry: tanker.taxExpiry,
+                          pollutionExpiry: tanker.pollutionExpiry,
+                          vehicleNumber: tanker.vehicleNumber,
+                          status: 'Under Maintenance', // Changed status
+                        ),
+                      );
+                      await loadInitialData();
+                    }
                   },
                 );
               },
@@ -125,7 +167,10 @@ class _SupplierHomePageState extends State<SupplierHomePage> {
         onTap: () => Navigator.pushNamed(context, route),
         child: Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Column(
             children: [
               Icon(icon, color: color),

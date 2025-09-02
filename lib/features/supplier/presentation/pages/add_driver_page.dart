@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../../core/constants/app_colors.dart';
-import '../../data/models/driver_model.dart';
-import '../../data/services/driver_api_service.dart';
+import '../../../../shared/models/driver_model.dart';
+import '../../../../core/services/driver_service.dart';
 import '../widgets/add_driver/file_upload_widget.dart';
 import '../widgets/add_driver/text_input_widget.dart';
 
@@ -24,43 +24,69 @@ class _AddDriverPageState extends State<AddDriverPage> {
   File? licenseFile;
   File? aadharFile;
 
+  @override
+  void dispose() {
+    nameController.dispose();
+    phoneController.dispose();
+    emailController.dispose();
+    licenseController.dispose();
+    aadharController.dispose();
+    super.dispose();
+  }
+
   Future<void> pickLicenseFile() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (picked != null) setState(() => licenseFile = File(picked.path));
+    if (picked != null) {
+      setState(() => licenseFile = File(picked.path));
+    }
   }
 
   Future<void> pickAadharFile() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (picked != null) setState(() => aadharFile = File(picked.path));
+    if (picked != null) {
+      setState(() => aadharFile = File(picked.path));
+    }
   }
 
   Future<void> addDriver() async {
-    if (nameController.text.isEmpty || phoneController.text.isEmpty || licenseController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all required fields")));
+    if (nameController.text.isEmpty ||
+        phoneController.text.isEmpty ||
+        licenseController.text.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Please fill all required fields")));
+      }
       return;
     }
 
-    final driver = Driver(
-      name: nameController.text,
-      phone: phoneController.text,
-      email: emailController.text,
+    final driver = DriverModel(
+      fullName: nameController.text,
+      businessAddress: 'N/A', // Dummy value
       licenseNumber: licenseController.text,
-      aadharNumber: aadharController.text,
-      licenseFilePath: licenseFile?.path,
-      aadharFilePath: aadharFile?.path,
+      licenseExpiry: '2025-12-31', // Dummy value
+      vehicleType: 'truck', // Dummy value
+      experience: 0.0, // Dummy value
+      documents: {
+        'aadharCard': aadharController.text,
+        'drivingLicense': licenseController.text, // Using license number as driving license document for now
+      },
+      bankDetails: {}, // Dummy empty map
+      phoneNumber: phoneController.text, // Added phoneNumber
     );
 
-    try {
-      await DriverApiService().addDriver(
-        driver: driver,
-        licenseFile: licenseFile,
-        aadharFile: aadharFile,
-      );
+    final response = await DriverService().createDriver(driver);
 
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Driver added successfully")));
-      Navigator.pushReplacementNamed(context, '/supplier-home');
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to add driver")));
+    if (response.success) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Driver added successfully")));
+        Navigator.pushReplacementNamed(context, '/supplier-home');
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(response.error ?? "Failed to add driver")));
+      }
     }
   }
 
@@ -71,7 +97,8 @@ class _AddDriverPageState extends State<AddDriverPage> {
         title: const Text("Add Driver"),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pushReplacementNamed(context, '/supplier-home'),
+          onPressed: () =>
+              Navigator.pushReplacementNamed(context, '/supplier-home'),
         ),
       ),
       body: SingleChildScrollView(
@@ -79,22 +106,33 @@ class _AddDriverPageState extends State<AddDriverPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Add New Driver", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text("Add New Driver",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             CustomTextInput(label: "Full Name", controller: nameController),
-            CustomTextInput(label: "Phone Number", controller: phoneController),
+            CustomTextInput(
+                label: "Phone Number", controller: phoneController),
             CustomTextInput(label: "Email", controller: emailController),
-            CustomTextInput(label: "License Number", controller: licenseController),
-            FileUploadWidget(label: "Upload License Document", file: licenseFile, onPressed: pickLicenseFile),
-            CustomTextInput(label: "Aadhar Number", controller: aadharController),
-            FileUploadWidget(label: "Upload Aadhar Document", file: aadharFile, onPressed: pickAadharFile),
+            CustomTextInput(
+                label: "License Number", controller: licenseController),
+            FileUploadWidget(
+                label: "Upload License Document",
+                file: licenseFile,
+                onPressed: pickLicenseFile),
+            CustomTextInput(
+                label: "Aadhar Number", controller: aadharController),
+            FileUploadWidget(
+                label: "Upload Aadhar Document",
+                file: aadharFile,
+                onPressed: pickAadharFile),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: addDriver,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryRed,
                 minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
               child: const Text("Add Driver"),
             ),

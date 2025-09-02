@@ -18,13 +18,6 @@ class AddTruckApiService {
 
   // TODO: When backend is ready, replace `addTruck` with actual POST request
   // Future<void> addTruckToBackend(AddTruckModel truck) async {
-  //   final response = await http.post(
-  //     Uri.parse('https://api.example.com/trucks'),
-  //     headers: {'Content-Type': 'application/json'},
-  //     body: jsonEncode(truck.toJson()),
-  //   );
-  //   if (response.statusCode != 200) {
-  //     throw Exception('Failed to add truck');
-  //   }
+  //   // Implement with Dio + ApiHelper when backend schema is ready.
   // }
 }

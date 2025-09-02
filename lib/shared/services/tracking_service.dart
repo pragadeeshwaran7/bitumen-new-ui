@@ -35,14 +35,5 @@ class TrackingApiService {
     return _mockTrackingOrders;
   }
 
-  // TODO: Replace with real backend logic
-  // Future<List<Tracking>> fetchTrackingOrdersFromBackend() async {
-  //   final response = await http.get(Uri.parse('https://yourapi.com/tracking'));
-  //   if (response.statusCode == 200) {
-  //     final List data = jsonDecode(response.body);
-  //     return data.map((json) => Tracking.fromJson(json)).toList();
-  //   } else {
-  //     throw Exception('Failed to load tracking info');
-  //   }
-  // }
+  // TODO: Replace with real backend logic using Dio and ApiHelper.
 }

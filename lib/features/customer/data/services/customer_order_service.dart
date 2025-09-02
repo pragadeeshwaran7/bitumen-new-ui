@@ -1,57 +1,99 @@
 import 'dart:async';
-// import 'package:http/http.dart' as http;
-// import 'dart:convert';
-import '../../data/models/customer_order.dart';
+import 'dart:convert';
+import 'dart:developer' as developer;
+import 'package:dio/dio.dart';
+import '../../../../core/services/api_config.dart';
+import '../../../../core/utils/api_helper.dart';
+import '../../../../core/services/auth_service.dart';
+import '../../../../shared/models/order_model.dart'; // Updated import
 
 class CustomerApiService {
   static final CustomerApiService _instance = CustomerApiService._internal();
   factory CustomerApiService() => _instance;
   CustomerApiService._internal();
 
-  // Mock data
-  final List<CustomerOrder> _mockOrders = [
-    CustomerOrder(
-      orderId: "TR123456789",
-      date: "2025-02-15",
-      pickup: "Mumbai, Maharashtra",
-      delivery: "Pune, Maharashtra",
-      goods: "VG30 Bitumen (2 Tons)",
-      amount: "₹12,500",
-      status: "In Transit",
-      driverName: "Ravi Kumar",
-      driverPhone: "+91 9876543210",
-      billurl: null,
-    ),
-    CustomerOrder(
-      orderId: "TR987654321",
-      date: "2025-02-18",
-      pickup: "Delhi, Delhi",
-      delivery: "Jaipur, Rajasthan",
-      goods: "PMB Bitumen (3 Tons)",
-      amount: "₹18,750",
-      status: "Completed",
-      driverName: "Ajay Sharma",
-      driverPhone: "+91 9123456789",
-      billurl: "https://example.com/bill_TR123456789.pdf",
-    ),
-  ];
+  final AuthService _authService = AuthService();
+  final Dio _dio = ApiHelper.createDio(); // Added Dio instance
 
-  Future<List<CustomerOrder>> fetchOrders({String filter = 'All'}) async {
-    await Future.delayed(const Duration(milliseconds: 500)); // simulate delay
+  Future<List<OrderModel>> fetchOrders({String filter = 'All'}) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        developer.log('No authentication token found', name: 'CustomerOrderService');
+        return [];
+      }
 
-    if (filter == 'All') return _mockOrders;
+      final url = ApiConfig.getEndpoint('orders');
+      ApiConfig.logRequest('GET', url, null);
+      
+      final response = await ApiHelper.retryableRequest(() => _dio.get(
+        url,
+        options: Options(headers: ApiConfig.getHeaders(token: token)),
+      ));
 
-    return _mockOrders.where((order) => order.status == filter).toList();
+      final norm = ApiHelper.normalizeResponse(response);
+      ApiConfig.logResponse('orders', norm['statusCode'] ?? -1, norm['text']);
+
+      if ((norm['statusCode'] ?? -1) == 200) {
+        final data = norm['data'] ?? (norm['text'].isNotEmpty ? jsonDecode(norm['text']) : null);
+        if (data != null && data['data'] is List) {
+          final orders = (data['data'] as List)
+              .map((orderJson) => OrderModel.fromJson(orderJson))
+              .toList();
+
+          // Apply filter if specified
+          if (filter != 'All') {
+            return orders.where((order) => order.status?.toLowerCase() == filter.toLowerCase()).toList();
+          }
+          return orders;
+        }
+      }
+
+      developer.log('Failed to fetch orders: ${norm['text']}', name: 'CustomerOrderService');
+      return [];
+    } catch (e) {
+      developer.log('Error fetching orders: $e', name: 'CustomerOrderService');
+      return [];
+    }
   }
 
-  // TODO: Replace mock logic with real API
-  // Future<List<CustomerOrder>> fetchOrdersFromBackend(String filter) async {
-  //   final response = await http.get(Uri.parse('https://yourapi.com/orders?status=$filter'));
-  //   if (response.statusCode == 200) {
-  //     final List<dynamic> data = json.decode(response.body);
-  //     return data.map((json) => CustomerOrder.fromJson(json)).toList();
-  //   } else {
-  //     throw Exception('Failed to load orders');
-  //   }
-  // }
+  Future<OrderModel?> createOrder(OrderModel order) async { // Changed parameter type
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        developer.log('No authentication token found', name: 'CustomerOrderService');
+        return null;
+      }
+
+      final url = ApiConfig.getEndpoint('create-order');
+      final body = order.toJson(); // Use toJson()
+      print('Request body: ' + jsonEncode(body));
+      print('POSTing to: $url');
+      ApiConfig.logRequest('POST', url, jsonEncode(body));
+      
+      final response = await ApiHelper.retryableRequest(() => _dio.post(
+        url,
+        data: body, // Pass as map
+        options: Options(headers: ApiConfig.getHeaders(token: token)),
+      ));
+      print('Response: ' + response.toString());
+
+      final norm = ApiHelper.normalizeResponse(response);
+      ApiConfig.logResponse('create-order', norm['statusCode'] ?? -1, norm['text']);
+
+      if ((norm['statusCode'] ?? -1) == 200 || (norm['statusCode'] ?? -1) == 201) {
+        final data = norm['data'] ?? (norm['text'].isNotEmpty ? jsonDecode(norm['text']) : null);
+        if (data != null && data['data'] != null) {
+          return OrderModel.fromJson(data['data']);
+        }
+      }
+
+      developer.log('Failed to create order: ${norm['text']}', name: 'CustomerOrderService');
+      return null;
+    } catch (e) {
+      print('Dio error: $e');
+      developer.log('Error creating order: $e', name: 'CustomerOrderService');
+      return null;
+    }
+  }
 }

@@ -96,7 +96,7 @@ class _CommonLoginFormState extends State<CommonLoginForm> {
     final phone = _phoneController.text.trim();
     final otp = _otpController.text.trim();
 
-  if (phone.isEmpty || !RegExp(r'^[0-9]{10}$').hasMatch(phone)) {
+    if (phone.isEmpty || !RegExp(r'^[0-9]{10}$').hasMatch(phone)) {
       setState(() {
         _errorMessage = 'Please enter a valid 10-digit phone number';
       });
@@ -127,42 +127,59 @@ class _CommonLoginFormState extends State<CommonLoginForm> {
 
     developer.log('🔐 Verifying OTP for: $phone', name: 'LoginForm');
 
-    final response = await _authService.loginWithOtp(
-      phoneNumber: phone,
-      emailAddress: _emailController.text.trim(),
-      otp: otp,
-      role: widget.role,
-    );
+    try {
+      final response = await _authService.loginWithOtp(
+        phoneNumber: phone,
+        emailAddress: _emailController.text.trim(),
+        otp: otp,
+      );
 
-    setState(() {
-      _isLoading = false;
-    });
-
-    if (response.success) {
-      final user = response.data!;
-      developer.log('✅ Login successful: ${user.toString()}', name: 'LoginForm');
-
-      if (mounted) {
-        // Navigate based on user role
-        String homeRoute = _getHomeRoute(user.role);
-        Navigator.pushReplacementNamed(context, homeRoute);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Welcome, ${user.role}!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } else {
       setState(() {
-        _errorMessage = response.error;
+        _isLoading = false;
       });
 
+      if (response.success) {
+        final user = response.data!;
+        developer.log('✅ Login successful: ${user.toString()}', name: 'LoginForm');
+
+        if (mounted) {
+          // Navigate based on user role
+          String homeRoute = _getHomeRoute(user.role);
+          Navigator.pushReplacementNamed(context, homeRoute);
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Welcome, ${user.role}!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        setState(() {
+          _errorMessage = response.error;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response.error ?? 'Login failed'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      developer.log('❌ OTP verification error: $e', name: 'LoginForm');
+      
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'An unexpected network error occurred. Please try again.';
+      });
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(response.error ?? 'Login failed'),
+            content: Text('An unexpected network error occurred: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -243,25 +260,31 @@ class _CommonLoginFormState extends State<CommonLoginForm> {
           ),
           const SizedBox(height: 16),
           
-          // OTP Field (always shown so user can paste/enter any 6-digit code)
-          TextFormField(
-            controller: _otpController,
-            keyboardType: TextInputType.number,
-            enabled: !_isLoading,
-            decoration: const InputDecoration(
-              labelText: 'OTP',
-              hintText: 'Enter 6-digit OTP (or tap Send OTP to request)',
-              prefixIcon: Icon(Icons.security),
-              border: OutlineInputBorder(),
+          // OTP Field (shown only after OTP is sent)
+          if (_isOtpSent) ...[
+            TextFormField(
+              controller: _otpController,
+              keyboardType: TextInputType.number,
+              enabled: !_isLoading,
+              decoration: const InputDecoration(
+                labelText: 'OTP',
+                hintText: 'Enter 6-digit OTP',
+                prefixIcon: Icon(Icons.security),
+                border: OutlineInputBorder(),
+              ),
+              maxLength: 6,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter the OTP';
+                }
+                if (value.length != 6) {
+                  return 'OTP must be 6 digits';
+                }
+                return null;
+              },
             ),
-            validator: (value) {
-              if (value != null && value.isNotEmpty && value.length != 6) {
-                return 'OTP must be 6 digits';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
+          ],
           
           // Error Message
           if (_errorMessage != null) ...[
@@ -285,7 +308,7 @@ class _CommonLoginFormState extends State<CommonLoginForm> {
           ElevatedButton(
             onPressed: _isLoading
                 ? null
-                : (_otpController.text.trim().length == 6 ? _verifyOtp : _sendOtp),
+                : (_isOtpSent ? _verifyOtp : _sendOtp),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryRed,
               foregroundColor: Colors.white,
@@ -303,18 +326,19 @@ class _CommonLoginFormState extends State<CommonLoginForm> {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
-                : Text(_otpController.text.trim().length == 6 ? 'Verify OTP' : 'Send OTP'),
+                : Text(_isOtpSent ? 'Verify & Login' : 'Send OTP'),
           ),
           
           // Help Text
           const SizedBox(height: 16),
-          Text(
-            'Enter a 6-digit OTP or tap Send OTP to request one. For testing, you can use: 000000',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppColors.greyText,
+          if (!_isOtpSent)
+            Text(
+              'Tap "Send OTP" to receive a verification code on your phone.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.greyText,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
         ],
       ),
     );

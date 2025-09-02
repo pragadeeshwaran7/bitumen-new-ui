@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'dart:developer' as developer;
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import '../models/api_response.dart';
 import 'api_config.dart';
 import 'auth_service.dart';
+import '../utils/api_helper.dart';
 
 class UserService {
   final AuthService _auth = AuthService();
@@ -14,10 +14,11 @@ class UserService {
       if (token == null) return ApiResponse.error('No token');
 
       final url = ApiConfig.getEndpoint('all-users');
-      final resp = await http.get(Uri.parse(url), headers: ApiConfig.getHeaders(token: token));
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body);
-        return ApiResponse.success(data['data'] ?? []);
+      final dio = ApiHelper.createDio();
+      final response = await ApiHelper.retryableRequest(() => dio.get(url, options: Options(headers: ApiConfig.getHeaders(token: token))));
+      final norm = ApiHelper.normalizeResponse(response);
+      if ((norm['statusCode'] ?? -1) == 200) {
+        return ApiResponse.success(norm['data']?['data'] ?? norm['data'] ?? []);
       }
       return ApiResponse.error('Failed to fetch users');
     } catch (e) {
@@ -32,10 +33,11 @@ class UserService {
       if (token == null) return ApiResponse.error('No token');
 
       final url = ApiConfig.getEndpoint('user-by-id', pathParams: {'id': id});
-      final resp = await http.get(Uri.parse(url), headers: ApiConfig.getHeaders(token: token));
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body);
-        return ApiResponse.success(data['data']);
+      final dio = ApiHelper.createDio();
+      final response = await ApiHelper.retryableRequest(() => dio.get(url, options: Options(headers: ApiConfig.getHeaders(token: token))));
+      final norm = ApiHelper.normalizeResponse(response);
+      if ((norm['statusCode'] ?? -1) == 200) {
+        return ApiResponse.success(norm['data']?['data'] ?? norm['data']);
       }
       return ApiResponse.error('Failed to fetch user');
     } catch (e) {

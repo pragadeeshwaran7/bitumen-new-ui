@@ -69,14 +69,14 @@ class _DriverHomePageState extends State<DriverHomePage> {
         automaticallyImplyLeading: false,
         elevation: 0.5,
         title: Text(
-          "Hello, ${driver!.name}",
+          "Hello, ${driver!.fullName}", // Changed to fullName
           style: const TextStyle(color: AppColors.black, fontWeight: FontWeight.bold),
         ),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DriverHomeHeader(driverId: driver!.driverId),
+          DriverHomeHeader(driverId: driver!.id!), // Changed to id!
           DriverHomeTabs(selectedTab: selectedTab, onTabChange: onTabChange),
           Expanded(
             child: ListView.builder(

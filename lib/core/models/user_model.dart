@@ -1,48 +1,41 @@
-class UserModel {
+enum UserType {
+  customer,
+  driver,
+  supplier,
+}
+
+class User {
   final String id;
-  final String phoneNumber;
-  final String emailAddress;
-  final String? password;
-  final String role; // customer, driver, supplier
-  final String status; // active, inactive
-  final String? profile;
-  
-  UserModel({
+  final String name;
+  final String email;
+  final String phone;
+  final UserType userType;
+
+  User({
     required this.id,
-    required this.phoneNumber,
-    required this.emailAddress,
-    this.password,
-    required this.role,
-    required this.status,
-    this.profile,
+    required this.name,
+    required this.email,
+    required this.phone,
+    required this.userType,
   });
-  
-  factory UserModel.fromJson(Map<String, dynamic> json) {
-    return UserModel(
-      id: json['_id'] ?? json['id'] ?? '',
-      phoneNumber: json['phoneNumber'] ?? '',
-      emailAddress: json['emailAddress'] ?? '',
-      password: json['password'],
-      role: json['role'] ?? 'customer',
-      status: json['status'] ?? 'active',
-      profile: json['profile'],
+
+  factory User.fromJson(Map<String, dynamic> json) {
+    return User(
+      id: json['id'],
+      name: json['name'],
+      email: json['email'],
+      phone: json['phone'],
+      userType: UserType.values.firstWhere((e) => e.toString() == 'UserType.${json['userType']}'),
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'phoneNumber': phoneNumber,
-      'emailAddress': emailAddress,
-      if (password != null) 'password': password,
-      'role': role,
-      'status': status,
-      if (profile != null) 'profile': profile,
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'userType': userType.toString().split('.').last,
     };
-  }
-  
-  @override
-  String toString() {
-    return 'UserModel(id: $id, phone: $phoneNumber, email: $emailAddress, role: $role, status: $status)';
   }
 }

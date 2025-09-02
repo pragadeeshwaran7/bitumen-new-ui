@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/services/payment_service.dart';
 
 class CustomerPaymentsPage extends StatefulWidget {
   const CustomerPaymentsPage({super.key});
@@ -10,23 +11,12 @@ class CustomerPaymentsPage extends StatefulWidget {
 class _CustomerPaymentsPageState extends State<CustomerPaymentsPage> {
   String selectedFilter = 'All';
   int selectedIndex = 2;
+  late Future<List<Map<String, dynamic>>> _paymentsFuture;
 
-  // Placeholder payments data
-  final List<Map<String, dynamic>> allPayments = [
-    {
-      "payment_mode": "Net Banking",
-      "amount": "₹18,750",
-      "date": "2025-02-18",
-      "order_id": "TR987654321",
-      "receipt_id": "PAY2345678",
-      "status": "Pending"
-    },
-    // Add more entries if needed
-  ];
-
-  List<Map<String, dynamic>> get filteredPayments {
-    if (selectedFilter == 'All') return allPayments;
-    return allPayments.where((p) => p['status'] == selectedFilter).toList();
+  @override
+  void initState() {
+    super.initState();
+    _paymentsFuture = PaymentService().getPayments().then((response) => response.data ?? []);
   }
 
   void onBottomBarTap(int index) {
@@ -101,17 +91,17 @@ class _CustomerPaymentsPageState extends State<CustomerPaymentsPage> {
               children: [
                 const Icon(Icons.credit_card, color: Colors.red, size: 18),
                 const SizedBox(width: 6),
-                Text(payment['payment_mode'],
+                Text(payment['payment_mode'] ?? '',
                     style: const TextStyle(fontWeight: FontWeight.w500)),
               ],
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
+                color: statusColor.withAlpha(25),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Text(payment['status'],
+              child: Text(payment['status'] ?? '',
                   style: TextStyle(
                       color: statusColor,
                       fontWeight: FontWeight.bold,
@@ -120,16 +110,16 @@ class _CustomerPaymentsPageState extends State<CustomerPaymentsPage> {
           ],
         ),
         const SizedBox(height: 10),
-        Text(payment['amount'],
+        Text('\u20b9${payment['amount'] != null ? (payment['amount'] as double).toStringAsFixed(2) : ''}',
             style: const TextStyle(
                 fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red)),
         const SizedBox(height: 4),
-        Text(payment['date'],
+        Text(payment['createdAt'] != null ? DateTime.parse(payment['createdAt']).toLocal().toString().split(' ')[0] : '',
             style: TextStyle(color: Colors.grey[600], fontSize: 13)),
         const SizedBox(height: 8),
-        Text("Order: ${payment['order_id']}",
+        Text("Order: ${payment['orderId'] ?? ''}",
             style: const TextStyle(fontSize: 13)),
-        Text("Receipt: ${payment['receipt_id']}",
+        Text("Receipt: ${payment['id'] ?? ''}",
             style: const TextStyle(fontSize: 13)),
       ]),
     );
@@ -156,10 +146,26 @@ class _CustomerPaymentsPageState extends State<CustomerPaymentsPage> {
           ),
           const SizedBox(height: 10),
           Expanded(
-            child: ListView.builder(
-              itemCount: filteredPayments.length,
-              itemBuilder: (context, index) =>
-                  buildPaymentCard(filteredPayments[index]),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: _paymentsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+                final payments = snapshot.data ?? [];
+                final filteredPayments = selectedFilter == 'All'
+                    ? payments
+                    : payments.where((p) => p['status'] == selectedFilter).toList();
+
+                return ListView.builder(
+                  itemCount: filteredPayments.length,
+                  itemBuilder: (context, index) =>
+                      buildPaymentCard(filteredPayments[index]),
+                );
+              },
             ),
           )
         ],

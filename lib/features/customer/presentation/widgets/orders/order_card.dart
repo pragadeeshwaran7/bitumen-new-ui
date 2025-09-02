@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+// import 'package:url_launcher/url_launcher.dart'; // Removed unused import
 import '../../../../../core/constants/app_colors.dart';
-import '../../../data/models/customer_order.dart';
+import '../../../../../shared/models/order_model.dart'; // Updated import
 
 class OrderCard extends StatelessWidget {
-  final CustomerOrder order;
+  final OrderModel order; // Changed type
 
   const OrderCard({super.key, required this.order});
 
@@ -12,14 +12,17 @@ class OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     Color statusColor;
     switch (order.status) {
-      case 'In Transit':
+      case 'in_transit': // Changed status
         statusColor = AppColors.primaryRed;
         break;
-      case 'Pending':
+      case 'pending': // Changed status
         statusColor = AppColors.orange;
         break;
-      default:
+      case 'delivered': // Changed status
         statusColor = AppColors.green;
+        break;
+      default:
+        statusColor = AppColors.greyText; // Default color for unknown status
     }
 
     return Container(
@@ -33,17 +36,16 @@ class OrderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _headerRow(order.orderId, order.status, statusColor),
+          _headerRow(order.id!, order.status!, statusColor), // Reverted to !
           const SizedBox(height: 8),
-          _infoRow("Date", order.date.toString().split(" ")[0]),
+          _infoRow("Date", order.pickupDate.toLocal().toString().split(" ")[0]), // Updated date
           const SizedBox(height: 12),
-          _locationRow(order.pickup, order.delivery),
+          _locationRow(order.pickupLocation, order.dropLocation), // Updated locations
           const SizedBox(height: 12),
-          _goodsRow(order.goods, order.amount),
+          _goodsRow(order.goodsType!, order.totalAmount!.toStringAsFixed(0)), // Reverted to !
           const SizedBox(height: 10),
-           _billRow(context, order.billurl),
-          const SizedBox(height: 10),
-          if (order.status != "Completed") _driverRow(order.driverName ?? "", order.driverPhone ?? ""),
+          // Removed _billRow as billurl is not in OrderModel
+          // Removed _driverRow as driverName and driverPhone are not in OrderModel
         ],
       ),
     );
@@ -57,7 +59,7 @@ class OrderCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.1),
+            color: statusColor.withAlpha(25),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Text(
@@ -115,63 +117,6 @@ class OrderCard extends StatelessWidget {
       children: [
         Text(goods, style: const TextStyle(fontWeight: FontWeight.w500)),
         Text(amount, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryRed)),
-      ],
-    );
-  }
-
-  Widget _billRow(BuildContext context, String? billUrl) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: TextButton.icon(
-        onPressed: () async {
-          if (billUrl != null && billUrl.isNotEmpty) {
-            final Uri uri = Uri.parse(billUrl);
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Could not open bill URL")),
-              );
-            }
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Bill not uploaded yet")),
-            );
-          }
-        },
-        icon: const Icon(Icons.receipt_long, color: AppColors.primaryRed),
-        label: const Text("View Bill", style: TextStyle(color: AppColors.primaryRed)),
-      ),
-    );
-  }
-
-  Widget _driverRow(String name, String phone) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Driver: $name", style: const TextStyle(fontWeight: FontWeight.w500)),
-            Text("Phone: $phone", style: const TextStyle(color: AppColors.greyText)),
-          ],
-        ),
-        ElevatedButton.icon(
-          onPressed: () async {
-            final Uri uri = Uri(scheme: 'tel', path: phone);
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri);
-            } else {
-              throw 'Could not launch $uri';
-            }
-          },
-          icon: const Icon(Icons.call),
-          label: const Text("Call"),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryRed,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-          ),
-        ),
       ],
     );
   }

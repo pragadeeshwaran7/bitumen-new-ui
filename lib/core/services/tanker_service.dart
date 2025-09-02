@@ -1,100 +1,52 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import '../models/api_response.dart';
+import '../shared/models/tanker_model.dart';
 import '../utils/api_helper.dart';
 import 'api_config.dart';
 import 'auth_service.dart';
 
-class TankerModel {
-  final String? id;
-  final String? supplierId;
-  final String registrationNumber;
-  final String type;
-  final double capacity;
-  final String status;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-  
-  TankerModel({
-    this.id,
-    this.supplierId,
-    required this.registrationNumber,
-    required this.type,
-    required this.capacity,
-    this.status = 'available',
-    this.createdAt,
-    this.updatedAt,
-  });
-  
-  factory TankerModel.fromJson(Map<String, dynamic> json) {
-    return TankerModel(
-      id: json['_id'] ?? json['id'],
-      supplierId: json['supplierId'],
-      registrationNumber: json['registrationNumber'] ?? '',
-      type: json['type'] ?? '',
-      capacity: (json['capacity'] ?? 0.0).toDouble(),
-      status: json['status'] ?? 'available',
-      createdAt: json['createdAt'] != null 
-          ? DateTime.parse(json['createdAt']) 
-          : null,
-      updatedAt: json['updatedAt'] != null 
-          ? DateTime.parse(json['updatedAt']) 
-          : null,
-    );
-  }
-  
-  Map<String, dynamic> toJson() {
-    return {
-      if (id != null) '_id': id,
-      if (supplierId != null) 'supplierId': supplierId,
-      'registrationNumber': registrationNumber,
-      'type': type,
-      'capacity': capacity,
-      'status': status,
-    };
-  }
-}
-
 class TankerService {
   final AuthService _authService = AuthService();
+  final Dio _dio = ApiHelper.createDio(); // Added Dio instance
   
+  /// Initialize with auth token
+  Future<void> initialize() async {
+    final token = await _authService.getToken();
+    if (token != null) {
+      _dio.options.headers['Authorization'] = 'Bearer $token';
+    }
+  }
+
   /// Get supplier tankers (scoped to supplier role)
   Future<ApiResponse<List<TankerModel>>> getSupplierTankers() async {
     try {
-      if (ApiConfig.disableSupplierTankers) {
-        print('⚠️ Supplier tankers API is disabled by configuration');
-        return ApiResponse.error('Supplier tankers feature is temporarily disabled');
-      }
-      print('🚛 GETTING SUPPLIER TANKERS');
+      
+      developer.log('🚛 GETTING SUPPLIER TANKERS', name: 'TankerService');
       final token = await _authService.getToken();
       if (token == null) {
         return ApiResponse.error('No authentication token found');
       }
       final url = ApiConfig.getEndpoint('supplier-tankers');
       ApiConfig.logRequest('GET', url, null);
-      try {
-        final response = await ApiHelper.retryableRequest(() => http.get(
-          Uri.parse(url),
-          headers: ApiConfig.getHeaders(token: token),
-        ));
-        final responseBody = response.body;
-        print('📡 Supplier Tankers Response Status: ${response.statusCode}');
-        print('📡 Supplier Tankers Response Body: $responseBody');
-        ApiConfig.logResponse('supplier-tankers', response.statusCode, responseBody);
-        if (response.statusCode == 200) {
-          final data = jsonDecode(responseBody);
-          final List<dynamic> tankersJson = data['data'] ?? [];
-          final tankers = tankersJson.map((e) => TankerModel.fromJson(e)).toList();
-          return ApiResponse.success(tankers);
-        }
-      } catch (e) {
-        print('❌ API get supplier tankers failed: $e');
+      final response = await ApiHelper.retryableRequest(() => _dio.get(
+            url,
+            options: Options(headers: ApiConfig.getHeaders(token: token)),
+          ));
+      final norm = ApiHelper.normalizeResponse(response);
+      ApiConfig.logResponse('supplier-tankers', norm['statusCode'] ?? -1, norm['text']);
+      if ((norm['statusCode'] ?? -1) == 200) {
+        final data = norm['data'] ?? (norm['text'].isNotEmpty ? jsonDecode(norm['text']) : null);
+        final List<dynamic> tankersJson = data['data'] ?? [];
+        final tankers = tankersJson.map((e) => TankerModel.fromJson(e)).toList();
+        return ApiResponse.success(tankers);
+      } else {
+        final errorMessage = norm['data'] != null && norm['data']['message'] != null ? norm['data']['message'] : (norm['text'] ?? 'Failed to load supplier tankers');
+        return ApiResponse.error(errorMessage);
       }
-      return ApiResponse.error('Failed to load supplier tankers');
     } catch (e) {
-      print('❌ Error in getSupplierTankers: $e');
-      developer.log('❌ Error getting supplier tankers: $e', name: 'TankerService');
+      developer.log('❌ Error in getSupplierTankers: $e', name: 'TankerService');
       return ApiResponse.error('Network error: $e');
     }
   }
@@ -102,37 +54,29 @@ class TankerService {
   /// Get supplier tanker by ID
   Future<ApiResponse<TankerModel>> getSupplierTankerById(String id) async {
     try {
-      if (ApiConfig.disableSupplierTankers) {
-        print('⚠️ Supplier tanker API is disabled by configuration');
-        return ApiResponse.error('Supplier tanker feature is temporarily disabled');
-      }
-      print('🔍 GETTING SUPPLIER TANKER BY ID: $id');
+      
+      developer.log('🔍 GETTING SUPPLIER TANKER BY ID: $id', name: 'TankerService');
       final token = await _authService.getToken();
       if (token == null) {
         return ApiResponse.error('No authentication token found');
       }
       final url = ApiConfig.getEndpoint('supplier-tanker-by-id', pathParams: {'id': id});
       ApiConfig.logRequest('GET', url, null);
-      try {
-        final response = await ApiHelper.retryableRequest(() => http.get(
-          Uri.parse(url),
-          headers: ApiConfig.getHeaders(token: token),
-        ));
-        final responseBody = response.body;
-        print('📡 Supplier Tanker By ID Response Status: ${response.statusCode}');
-        print('📡 Supplier Tanker By ID Response Body: $responseBody');
-        ApiConfig.logResponse('supplier-tanker-by-id', response.statusCode, responseBody);
-        if (response.statusCode == 200) {
-          final data = jsonDecode(responseBody);
-          return ApiResponse.success(TankerModel.fromJson(data['data']));
-        }
-      } catch (e) {
-        print('❌ API get supplier tanker by id failed: $e');
+      final response = await ApiHelper.retryableRequest(() => _dio.get(
+            url,
+            options: Options(headers: ApiConfig.getHeaders(token: token)),
+          ));
+      final norm = ApiHelper.normalizeResponse(response);
+      ApiConfig.logResponse('supplier-tanker-by-id', norm['statusCode'] ?? -1, norm['text']);
+      if ((norm['statusCode'] ?? -1) == 200) {
+        final data = norm['data'] ?? (norm['text'].isNotEmpty ? jsonDecode(norm['text']) : null);
+        return ApiResponse.success(TankerModel.fromJson(data['data']));
+      } else {
+        final errorMessage = norm['data'] != null && norm['data']['message'] != null ? norm['data']['message'] : (norm['text'] ?? 'Failed to load supplier tanker');
+        return ApiResponse.error(errorMessage);
       }
-      return ApiResponse.error('Failed to load supplier tanker');
     } catch (e) {
-      print('❌ Error in getSupplierTankerById: $e');
-      developer.log('❌ Error getting supplier tanker by id: $e', name: 'TankerService');
+      developer.log('❌ Error in getSupplierTankerById: $e', name: 'TankerService');
       return ApiResponse.error('Network error: $e');
     }
   }
@@ -140,39 +84,33 @@ class TankerService {
   /// Update supplier tanker
   Future<ApiResponse<TankerModel>> updateSupplierTanker(String id, TankerModel tanker) async {
     try {
-      if (ApiConfig.disableSupplierTankers) {
-        print('⚠️ Update supplier tanker API is disabled by configuration');
-        return ApiResponse.error('Update supplier tanker is temporarily disabled');
-      }
-      print('✏️ UPDATING SUPPLIER TANKER: $id');
+      
+      developer.log('✏️ UPDATING SUPPLIER TANKER: $id', name: 'TankerService');
       final token = await _authService.getToken();
       if (token == null) {
         return ApiResponse.error('No authentication token found');
       }
       final url = ApiConfig.getEndpoint('update-supplier-tanker', pathParams: {'id': id});
-      final body = jsonEncode(tanker.toJson());
-      ApiConfig.logRequest('PUT', url, body);
-      try {
-        final response = await ApiHelper.retryableRequest(() => http.put(
-          Uri.parse(url),
-          headers: ApiConfig.getHeaders(token: token),
-          body: body,
-        ));
-        final responseBody = response.body;
-        print('📡 Update Supplier Tanker Response Status: ${response.statusCode}');
-        print('📡 Update Supplier Tanker Response Body: $responseBody');
-        ApiConfig.logResponse('update-supplier-tanker', response.statusCode, responseBody);
-        if (response.statusCode == 200) {
-          final data = jsonDecode(responseBody);
-          return ApiResponse.success(TankerModel.fromJson(data['data']));
-        }
-      } catch (e) {
-        print('❌ API update supplier tanker failed: $e');
+      final body = tanker.toJson(); // Use toJson()
+      ApiConfig.logRequest('PUT', url, jsonEncode(body));
+      final response = await ApiHelper.retryableRequest(() => _dio.put(
+            url,
+            data: body, // Pass as map
+            options: Options(headers: ApiConfig.getHeaders(token: token)),
+          ));
+      final norm = ApiHelper.normalizeResponse(response);
+      ApiConfig.logResponse('update-supplier-tanker', norm['statusCode'] ?? -1, norm['text']);
+      if ((norm['statusCode'] ?? -1) == 200) {
+        final data = norm['data'] ?? (norm['text'].isNotEmpty ? jsonDecode(norm['text']) : null);
+        final updatedTanker = TankerModel.fromJson(data['data']); // Re-add this line
+        developer.log('✅ Tanker updated successfully via API', name: 'TankerService');
+        return ApiResponse.success(updatedTanker); // Re-add this line
+      } else {
+        final errorMessage = norm['data'] != null && norm['data']['message'] != null ? norm['data']['message'] : (norm['text'] ?? 'Failed to update supplier tanker');
+        return ApiResponse.error(errorMessage);
       }
-      return ApiResponse.error('Failed to update supplier tanker');
     } catch (e) {
-      print('❌ Error in updateSupplierTanker: $e');
-      developer.log('❌ Error updating supplier tanker: $e', name: 'TankerService');
+      developer.log('❌ Error in updateSupplierTanker: $e', name: 'TankerService');
       return ApiResponse.error('Network error: $e');
     }
   }
@@ -180,36 +118,28 @@ class TankerService {
   /// Delete supplier tanker
   Future<ApiResponse<String>> deleteSupplierTanker(String id) async {
     try {
-      if (ApiConfig.disableSupplierTankers) {
-        print('⚠️ Delete supplier tanker API is disabled by configuration');
-        return ApiResponse.error('Delete supplier tanker is temporarily disabled');
-      }
-      print('🗑️ DELETING SUPPLIER TANKER: $id');
+      
+      developer.log('🗑️ DELETING SUPPLIER TANKER: $id', name: 'TankerService');
       final token = await _authService.getToken();
       if (token == null) {
         return ApiResponse.error('No authentication token found');
       }
       final url = ApiConfig.getEndpoint('delete-supplier-tanker', pathParams: {'id': id});
       ApiConfig.logRequest('DELETE', url, null);
-      try {
-        final response = await ApiHelper.retryableRequest(() => http.delete(
-          Uri.parse(url),
-          headers: ApiConfig.getHeaders(token: token),
-        ));
-        final responseBody = response.body;
-        print('📡 Delete Supplier Tanker Response Status: ${response.statusCode}');
-        print('📡 Delete Supplier Tanker Response Body: $responseBody');
-        ApiConfig.logResponse('delete-supplier-tanker', response.statusCode, responseBody);
-        if (response.statusCode == 200) {
-          return ApiResponse.success('Supplier tanker deleted successfully');
-        }
-      } catch (e) {
-        print('❌ API delete supplier tanker failed: $e');
+      final response = await ApiHelper.retryableRequest(() => _dio.delete(
+            url,
+            options: Options(headers: ApiConfig.getHeaders(token: token)),
+          ));
+      final norm = ApiHelper.normalizeResponse(response);
+      ApiConfig.logResponse('delete-supplier-tanker', norm['statusCode'] ?? -1, norm['text']);
+      if ((norm['statusCode'] ?? -1) == 200) {
+        return ApiResponse.success('Supplier tanker deleted successfully');
+      } else {
+        final errorMessage = norm['data'] != null && norm['data']['message'] != null ? norm['data']['message'] : (norm['text'] ?? 'Failed to delete supplier tanker');
+        return ApiResponse.error(errorMessage);
       }
-      return ApiResponse.error('Failed to delete supplier tanker');
     } catch (e) {
-      print('❌ Error in deleteSupplierTanker: $e');
-      developer.log('❌ Error deleting supplier tanker: $e', name: 'TankerService');
+      developer.log('❌ Error in deleteSupplierTanker: $e', name: 'TankerService');
       return ApiResponse.error('Network error: $e');
     }
   }
@@ -217,34 +147,29 @@ class TankerService {
   /// Assign driver to tanker
   Future<ApiResponse<String>> assignDriver({required String tankerId, required String driverId}) async {
     try {
-      print('👷 ASSIGNING DRIVER $driverId TO TANKER $tankerId');
+      developer.log('👷 ASSIGNING DRIVER $driverId TO TANKER $tankerId', name: 'TankerService');
       final token = await _authService.getToken();
       if (token == null) {
         return ApiResponse.error('No authentication token found');
       }
       final url = ApiConfig.getEndpoint('assign-driver');
-      final body = jsonEncode({'tankerId': tankerId, 'driverId': driverId});
-      ApiConfig.logRequest('POST', url, body);
-      try {
-        final response = await ApiHelper.retryableRequest(() => http.post(
-          Uri.parse(url),
-          headers: ApiConfig.getHeaders(token: token),
-          body: body,
-        ));
-        final responseBody = response.body;
-        print('📡 Assign Driver Response Status: ${response.statusCode}');
-        print('📡 Assign Driver Response Body: $responseBody');
-        ApiConfig.logResponse('assign-driver', response.statusCode, responseBody);
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          return ApiResponse.success('Driver assigned successfully');
-        }
-      } catch (e) {
-        print('❌ API assign driver failed: $e');
+      final body = {'tankerId': tankerId, 'driverId': driverId}; // Pass as map
+      ApiConfig.logRequest('POST', url, jsonEncode(body));
+      final response = await ApiHelper.retryableRequest(() => _dio.post(
+            url,
+            data: body, // Pass as map
+            options: Options(headers: ApiConfig.getHeaders(token: token)),
+          ));
+      final norm = ApiHelper.normalizeResponse(response);
+      ApiConfig.logResponse('assign-driver', norm['statusCode'] ?? -1, norm['text']);
+      if ((norm['statusCode'] ?? -1) == 200 || (norm['statusCode'] ?? -1) == 201) {
+        return ApiResponse.success('Driver assigned successfully');
+      } else {
+        final errorMessage = norm['data'] != null && norm['data']['message'] != null ? norm['data']['message'] : (norm['text'] ?? 'Failed to assign driver');
+        return ApiResponse.error(errorMessage);
       }
-      return ApiResponse.error('Failed to assign driver');
     } catch (e) {
-      print('❌ Error in assignDriver: $e');
-      developer.log('❌ Error assigning driver: $e', name: 'TankerService');
+      developer.log('❌ Error in assignDriver: $e', name: 'TankerService');
       return ApiResponse.error('Network error: $e');
     }
   }
@@ -252,85 +177,41 @@ class TankerService {
   /// Get all tankers for a supplier
   Future<ApiResponse<List<TankerModel>>> getTankers() async {
     try {
-      print('🚛 GETTING ALL TANKERS');
+      developer.log('🚛 GETTING ALL TANKERS', name: 'TankerService');
       
       final token = await _authService.getToken();
       if (token == null) {
-        print('❌ No authentication token found');
+        developer.log('❌ No authentication token found', name: 'TankerService');
         return ApiResponse.error('No authentication token found');
       }
       
       final url = ApiConfig.getEndpoint('tankers');
-      print('🌐 Tankers API URL: $url');
-      print('🔑 Using token: ${token.substring(0, 10)}...');
+      developer.log('🌐 Tankers API URL: $url', name: 'TankerService');
       
       ApiConfig.logRequest('GET', url, null);
       
-      // Try real API with retry
-      try {
-        final response = await ApiHelper.retryableRequest(() => http.get(
-          Uri.parse(url),
-          headers: ApiConfig.getHeaders(token: token),
-        ));
+      final response = await ApiHelper.retryableRequest(() => _dio.get(
+            url,
+            options: Options(headers: ApiConfig.getHeaders(token: token)),
+          ));
+      final norm = ApiHelper.normalizeResponse(response);
+      ApiConfig.logResponse('tankers', norm['statusCode'] ?? -1, norm['text']);
+      if ((norm['statusCode'] ?? -1) == 200) {
+        final data = norm['data'] ?? (norm['text'].isNotEmpty ? jsonDecode(norm['text']) : null);
+        final List<dynamic> tankersJson = data['data'] ?? [];
 
-        final responseBody = response.body;
-        print('📡 Tankers Response Status: ${response.statusCode}');
-        print('📡 Tankers Response Body: $responseBody');
+        final List<TankerModel> tankers = tankersJson
+            .map((json) => TankerModel.fromJson(json))
+            .toList();
 
-        ApiConfig.logResponse('tankers', response.statusCode, responseBody);
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(responseBody);
-          final List<dynamic> tankersJson = data['data'] ?? [];
-
-          final List<TankerModel> tankers = tankersJson
-              .map((json) => TankerModel.fromJson(json))
-              .toList();
-
-          print('✅ Tankers loaded from API: ${tankers.length} tankers');
-          return ApiResponse.success(tankers);
-        } else {
-          print('⚠️ API returned error, creating mock tankers');
-        }
-      } catch (e) {
-        print('❌ API call failed: $e');
-        print('⚠️ Creating mock tankers');
+        developer.log('✅ Tankers loaded from API: ${tankers.length} tankers', name: 'TankerService');
+        return ApiResponse.success(tankers);
+      } else {
+        final errorMessage = norm['data'] != null && norm['data']['message'] != null ? norm['data']['message'] : (norm['text'] ?? 'Failed to get tankers');
+        return ApiResponse.error(errorMessage);
       }
-      
-      // Create mock tankers for testing
-      final mockTankers = [
-        TankerModel(
-          id: 'tanker_1_${DateTime.now().millisecondsSinceEpoch}',
-          registrationNumber: 'MH12AB1234',
-          type: 'Bitumen Tanker',
-          capacity: 25000.0,
-          status: 'available',
-          createdAt: DateTime.now(),
-        ),
-        TankerModel(
-          id: 'tanker_2_${DateTime.now().millisecondsSinceEpoch}',
-          registrationNumber: 'DL01CD5678',
-          type: 'Heavy Duty Tanker',
-          capacity: 30000.0,
-          status: 'in_use',
-          createdAt: DateTime.now().subtract(Duration(days: 30)),
-        ),
-        TankerModel(
-          id: 'tanker_3_${DateTime.now().millisecondsSinceEpoch}',
-          registrationNumber: 'KA03EF9012',
-          type: 'Medium Tanker',
-          capacity: 20000.0,
-          status: 'maintenance',
-          createdAt: DateTime.now().subtract(Duration(days: 15)),
-        ),
-      ];
-      
-      print('✅ Mock tankers created: ${mockTankers.length} tankers');
-      return ApiResponse.success(mockTankers);
-      
     } catch (e) {
-      print('❌ Error in getTankers: $e');
-      developer.log('❌ Error getting tankers: $e', name: 'TankerService');
+      developer.log('❌ Error in getTankers: $e', name: 'TankerService');
       return ApiResponse.error('Network error: $e');
     }
   }
@@ -338,8 +219,8 @@ class TankerService {
   /// Create new tanker
   Future<ApiResponse<TankerModel>> createTanker(TankerModel tanker) async {
     try {
-      print('📝 CREATING NEW TANKER');
-      print('🚛 Tanker details: ${jsonEncode(tanker.toJson())}');
+      developer.log('📝 CREATING NEW TANKER', name: 'TankerService');
+      developer.log('🚛 Tanker details: ${jsonEncode(tanker.toJson())}', name: 'TankerService');
       
       final token = await _authService.getToken();
       if (token == null) {
@@ -347,53 +228,31 @@ class TankerService {
       }
       
       final url = ApiConfig.getEndpoint('create-tanker');
-      final body = jsonEncode(tanker.toJson());
+      final body = tanker.toJson(); // Use toJson()
       
-      print('🌐 Create Tanker URL: $url');
-      print('📤 Request Body: $body');
+      developer.log('🌐 Create Tanker URL: $url', name: 'TankerService');
+      developer.log('📤 Request Body: $body', name: 'TankerService');
       
-      ApiConfig.logRequest('POST', url, body);
+      ApiConfig.logRequest('POST', url, jsonEncode(body));
       
-      // Try real API with retry
-      try {
-        final response = await ApiHelper.retryableRequest(() => http.post(
-          Uri.parse(url),
-          headers: ApiConfig.getHeaders(token: token),
-          body: body,
-        ));
-
-        final responseBody = response.body;
-        print('📡 Create Tanker Response Status: ${response.statusCode}');
-        print('📡 Create Tanker Response Body: $responseBody');
-
-        ApiConfig.logResponse('create-tanker', response.statusCode, responseBody);
-
-        if (response.statusCode == 201 || response.statusCode == 200) {
-          final data = jsonDecode(responseBody);
-          final createdTanker = TankerModel.fromJson(data['data']);
-          print('✅ Tanker created successfully via API');
-          return ApiResponse.success(createdTanker);
-        }
-      } catch (e) {
-        print('❌ API tanker creation failed: $e');
+      final response = await ApiHelper.retryableRequest(() => _dio.post(
+            url,
+            data: body, // Pass as map
+            options: Options(headers: ApiConfig.getHeaders(token: token)),
+          ));
+      final norm = ApiHelper.normalizeResponse(response);
+      ApiConfig.logResponse('create-tanker', norm['statusCode'] ?? -1, norm['text']);
+      if ((norm['statusCode'] ?? -1) == 201 || (norm['statusCode'] ?? -1) == 200) {
+        final data = norm['data'] ?? (norm['text'].isNotEmpty ? jsonDecode(norm['text']) : null);
+        final createdTanker = TankerModel.fromJson(data['data']);
+        developer.log('✅ Tanker created successfully via API', name: 'TankerService');
+        return ApiResponse.success(createdTanker);
+      } else {
+        final errorMessage = norm['data'] != null && norm['data']['message'] != null ? norm['data']['message'] : (norm['text'] ?? 'Failed to create tanker');
+        return ApiResponse.error(errorMessage);
       }
-      
-      // Create mock tanker with ID
-      final mockTanker = TankerModel(
-        id: 'tanker_${DateTime.now().millisecondsSinceEpoch}',
-        registrationNumber: tanker.registrationNumber,
-        type: tanker.type,
-        capacity: tanker.capacity,
-        status: 'available',
-        createdAt: DateTime.now(),
-      );
-      
-      print('✅ Mock tanker created: ${mockTanker.id}');
-      return ApiResponse.success(mockTanker);
-      
     } catch (e) {
-      print('❌ Error in createTanker: $e');
-      developer.log('❌ Error creating tanker: $e', name: 'TankerService');
+      developer.log('❌ Error in createTanker: $e', name: 'TankerService');
       return ApiResponse.error('Network error: $e');
     }
   }
@@ -401,8 +260,8 @@ class TankerService {
   /// Update tanker
   Future<ApiResponse<TankerModel>> updateTanker(String tankerId, TankerModel tanker) async {
     try {
-      print('✏️ UPDATING TANKER: $tankerId');
-      print('🚛 Updated data: ${jsonEncode(tanker.toJson())}');
+      developer.log('✏️ UPDATING TANKER: $tankerId', name: 'TankerService');
+      developer.log('🚛 Updated data: ${jsonEncode(tanker.toJson())}', name: 'TankerService');
       
       final token = await _authService.getToken();
       if (token == null) {
@@ -410,53 +269,31 @@ class TankerService {
       }
       
       final url = ApiConfig.getEndpoint('update-tanker', pathParams: {'id': tankerId});
-      final body = jsonEncode(tanker.toJson());
+      final body = tanker.toJson(); // Use toJson()
       
-      print('🌐 Update Tanker URL: $url');
-      print('📤 Request Body: $body');
+      developer.log('🌐 Update Tanker URL: $url', name: 'TankerService');
+      developer.log('📤 Request Body: $body', name: 'TankerService');
       
-      ApiConfig.logRequest('PUT', url, body);
+      ApiConfig.logRequest('PUT', url, jsonEncode(body));
       
-      // Try real API with retry
-      try {
-        final response = await ApiHelper.retryableRequest(() => http.put(
-          Uri.parse(url),
-          headers: ApiConfig.getHeaders(token: token),
-          body: body,
-        ));
-
-        final responseBody = response.body;
-        print('📡 Update Tanker Response Status: ${response.statusCode}');
-        print('📡 Update Tanker Response Body: $responseBody');
-
-        ApiConfig.logResponse('update-tanker', response.statusCode, responseBody);
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(responseBody);
-          final updatedTanker = TankerModel.fromJson(data['data']);
-          print('✅ Tanker updated successfully via API');
-          return ApiResponse.success(updatedTanker);
-        }
-      } catch (e) {
-        print('❌ API tanker update failed: $e');
+      final response = await ApiHelper.retryableRequest(() => _dio.put(
+            url,
+            data: body, // Pass as map
+            options: Options(headers: ApiConfig.getHeaders(token: token)),
+          ));
+      final norm = ApiHelper.normalizeResponse(response);
+      ApiConfig.logResponse('update-tanker', norm['statusCode'] ?? -1, norm['text']);
+      if ((norm['statusCode'] ?? -1) == 200) {
+        final data = norm['data'] ?? (norm['text'].isNotEmpty ? jsonDecode(norm['text']) : null);
+        final updatedTanker = TankerModel.fromJson(data['data']); // Re-add this line
+        developer.log('✅ Tanker updated successfully via API', name: 'TankerService');
+        return ApiResponse.success(updatedTanker); // Re-add this line
+      } else {
+        final errorMessage = norm['data'] != null && norm['data']['message'] != null ? norm['data']['message'] : (norm['text'] ?? 'Failed to update tanker');
+        return ApiResponse.error(errorMessage);
       }
-      
-      // Return updated mock tanker
-      final updatedTanker = TankerModel(
-        id: tankerId,
-        registrationNumber: tanker.registrationNumber,
-        type: tanker.type,
-        capacity: tanker.capacity,
-        status: tanker.status,
-        updatedAt: DateTime.now(),
-      );
-      
-      print('✅ Mock tanker updated: $tankerId');
-      return ApiResponse.success(updatedTanker);
-      
     } catch (e) {
-      print('❌ Error in updateTanker: $e');
-      developer.log('❌ Error updating tanker: $e', name: 'TankerService');
+      developer.log('❌ Error in updateTanker: $e', name: 'TankerService');
       return ApiResponse.error('Network error: $e');
     }
   }
@@ -464,7 +301,7 @@ class TankerService {
   /// Delete tanker
   Future<ApiResponse<String>> deleteTanker(String tankerId) async {
     try {
-      print('🗑️ DELETING TANKER: $tankerId');
+      developer.log('🗑️ DELETING TANKER: $tankerId', name: 'TankerService');
       
       final token = await _authService.getToken();
       if (token == null) {
@@ -472,38 +309,24 @@ class TankerService {
       }
       
       final url = ApiConfig.getEndpoint('delete-tanker', pathParams: {'id': tankerId});
-      print('🌐 Delete Tanker URL: $url');
+      developer.log('🌐 Delete Tanker URL: $url', name: 'TankerService');
       
       ApiConfig.logRequest('DELETE', url, null);
       
-      // Try real API with retry
-      try {
-        final response = await ApiHelper.retryableRequest(() => http.delete(
-          Uri.parse(url),
-          headers: ApiConfig.getHeaders(token: token),
-        ));
-
-        final responseBody = response.body;
-        print('📡 Delete Tanker Response Status: ${response.statusCode}');
-        print('📡 Delete Tanker Response Body: $responseBody');
-
-        ApiConfig.logResponse('delete-tanker', response.statusCode, responseBody);
-
-        if (response.statusCode == 200) {
-          print('✅ Tanker deleted successfully via API');
-          return ApiResponse.success('Tanker deleted successfully');
-        }
-      } catch (e) {
-        print('❌ API tanker deletion failed: $e');
+      final response = await ApiHelper.retryableRequest(() => _dio.delete(
+            url,
+            options: Options(headers: ApiConfig.getHeaders(token: token)),
+          ));
+      final norm = ApiHelper.normalizeResponse(response);
+      ApiConfig.logResponse('delete-tanker', norm['statusCode'] ?? -1, norm['text']);
+      if ((norm['statusCode'] ?? -1) == 200) {
+        return ApiResponse.success('Tanker deleted successfully');
+      } else {
+        final errorMessage = norm['data'] != null && norm['data']['message'] != null ? norm['data']['message'] : (norm['text'] ?? 'Failed to delete tanker');
+        return ApiResponse.error(errorMessage);
       }
-      
-      // Mock success
-      print('✅ Mock tanker deleted: $tankerId');
-      return ApiResponse.success('Tanker deleted successfully (Mock)');
-      
     } catch (e) {
-      print('❌ Error in deleteTanker: $e');
-      developer.log('❌ Error deleting tanker: $e', name: 'TankerService');
+      developer.log('❌ Error in deleteTanker: $e', name: 'TankerService');
       return ApiResponse.error('Network error: $e');
     }
   }

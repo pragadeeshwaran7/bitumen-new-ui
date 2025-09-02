@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../data/services/tanker_api_service.dart';
+import '../../../../../core/services/driver_service.dart';
+import '../../../../../shared/models/driver_model.dart';
 
 class AssignDriverModal extends StatefulWidget {
-  final void Function(Map<String, String>) onSelect;
+  final void Function(DriverModel) onSelect;
 
   const AssignDriverModal({super.key, required this.onSelect});
 
@@ -11,17 +12,22 @@ class AssignDriverModal extends StatefulWidget {
 }
 
 class _AssignDriverModalState extends State<AssignDriverModal> {
-  late Future<List<Map<String, String>>> _driversFuture;
+  late Future<List<DriverModel>> _driversFuture;
 
   @override
   void initState() {
     super.initState();
-    _driversFuture = TankerApiService().fetchAvailableDrivers();
+    _driversFuture = _loadDrivers();
+  }
+
+  Future<List<DriverModel>> _loadDrivers() async {
+    final resp = await DriverService().getDrivers();
+    return resp.data ?? [];
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Map<String, String>>>(
+    return FutureBuilder<List<DriverModel>>(
       future: _driversFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -44,8 +50,8 @@ class _AssignDriverModalState extends State<AssignDriverModal> {
           children: availableDrivers.map((driver) {
             return ListTile(
               leading: const Icon(Icons.person),
-              title: Text(driver['name']!),
-              subtitle: Text(driver['phone']!),
+              title: Text(driver.fullName), // Changed to fullName
+              subtitle: Text(driver.phoneNumber), // Changed to phoneNumber
               onTap: () {
                 widget.onSelect(driver);
                 Navigator.pop(context);

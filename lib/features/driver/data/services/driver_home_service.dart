@@ -21,9 +21,36 @@ class DriverHomeApiService {
   ];
 
   final DriverModel _mockDriver = DriverModel(
-    driverId: 'DRV001',
-    name: 'Ranjith Kumar',
-    phone: '+91 9876543210',
+    fullName: 'Ranjith Kumar',
+    businessAddress: '123 Main St, Anytown',
+    licenseNumber: 'DL1234567890',
+    licenseExpiry: '2025-12-31',
+    vehicleType: 'truck',
+    experience: 5.0,
+    documents: {
+      'panCard': 'ABCDE1234F',
+      'aadharCard': '123456789012',
+      'drivingLicense': 'DL1234567890',
+      'vehicleRC': 'RC1234567890',
+      'vehicleInsurance': 'INS1234567890',
+      'vehiclePermit': 'PERMIT123456',
+    },
+    bankDetails: {
+      'accountNumber': '1234567890',
+      'ifscCode': 'BANK0000001',
+      'accountHolderName': 'Ranjith Kumar',
+    },
+    id: 'DRV001', // Optional, but good to include
+    user: 'user123', // Optional
+    role: 'driver', // Optional
+    isAvailable: true, // Optional
+    rating: 4.5, // Optional
+    totalTrips: 100, // Optional
+    assignedTanker: null, // Optional
+    supplier: 'supplier123', // Optional
+    createdAt: DateTime.now(), // Optional
+    updatedAt: DateTime.now(), // Optional
+    phoneNumber: '+91 9876543210', // Added phoneNumber
   );
 
   int _totalKmCovered = 0;

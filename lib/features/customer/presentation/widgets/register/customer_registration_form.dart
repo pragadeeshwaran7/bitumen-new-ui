@@ -29,6 +29,7 @@ class _CustomerRegistrationFormState extends State<CustomerRegistrationForm> {
   
   File? _selectedGstFile;
   bool _isLoading = false;
+  bool _isOtpSent = false;
   String? _errorMessage;
 
   @override
@@ -37,6 +38,7 @@ class _CustomerRegistrationFormState extends State<CustomerRegistrationForm> {
     _phoneController.dispose();
     _emailController.dispose();
     _gstController.dispose();
+    _otpController.dispose();
     super.dispose();
   }
 
@@ -65,56 +67,140 @@ class _CustomerRegistrationFormState extends State<CustomerRegistrationForm> {
     }
   }
 
-  Future<void> _registerCustomer() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _sendOtp() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty || !RegExp(r'^[0-9]{10}$').hasMatch(phone)) {
+      setState(() {
+        _errorMessage = 'Please enter a valid 10-digit phone number';
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a valid 10-digit phone number'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
 
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
-    developer.log('🚀 Registering customer: ${_nameController.text}', name: 'CustomerRegistration');
+    developer.log('🚀 Sending OTP for registration to: $phone', name: 'CustomerRegistration');
+
+    final response = await _authService.sendOtp(phoneNumber: phone);
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    if (response.success) {
+      setState(() {
+        _isOtpSent = true;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response.data ?? 'OTP sent successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else {
+      setState(() {
+        _errorMessage = response.error;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response.error ?? 'Failed to send OTP'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _registerCustomer() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (!_isOtpSent) {
+      setState(() {
+        _errorMessage = 'Please send OTP first';
+      });
+      return;
+    }
+
+    final otp = _otpController.text.trim();
+    if (otp.isEmpty || otp.length != 6) {
+      setState(() {
+        _errorMessage = 'Please enter the 6-digit OTP';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    developer.log('🚀 Registering customer...', name: 'CustomerRegistration');
 
     try {
-      final success = await _authService.registerCustomer(
-        name: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
-        email: _emailController.text.trim(),
-        gstNumber: _gstController.text.trim(),
-  gstFile: _selectedGstFile,
-  otp: _otpController.text.trim().isEmpty ? null : _otpController.text.trim(),
+      final response = await _authService.registerWithOtp(
+        phoneNumber: _phoneController.text.trim(),
+        emailAddress: _emailController.text.trim(),
+        role: 'customer',
+        otp: otp,
       );
 
       setState(() {
         _isLoading = false;
       });
 
-      if (success) {
+      if (response.success) {
         developer.log('✅ Customer registration successful', name: 'CustomerRegistration');
+        
+        // Save additional customer details to profile
+        final user = response.data;
+        developer.log('User data: ${user.toString()}', name: 'CustomerRegistration');
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Registration successful! Please login.'),
+              content: Text('Registration successful! Redirecting to home...'),
               backgroundColor: Colors.green,
             ),
           );
           
-          // Call the callback to switch to login mode
-          widget.onRegistered();
+          // Navigate directly to customer home screen
+          Navigator.of(context).pushNamedAndRemoveUntil('/customer/home', (route) => false);
         }
       } else {
         setState(() {
-          _errorMessage = 'Registration failed. Please try again.';
+          _errorMessage = response.error ?? 'Registration failed. Please try again.';
         });
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Registration failed. Please try again.'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          if (response.error == 'User already exists. Please try logging in.') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(response.error!),
+                backgroundColor: Colors.orange,
+              ),
+            );
+            // Optionally navigate to login or show a login button
+            // Navigator.pushReplacementNamed(context, '/login');
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(response.error ?? 'Registration failed. Please try again.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
         }
       }
     } catch (e) {
@@ -178,7 +264,7 @@ class _CustomerRegistrationFormState extends State<CustomerRegistrationForm> {
           TextFormField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
-            enabled: !_isLoading,
+            enabled: !_isLoading && !_isOtpSent,
             decoration: const InputDecoration(
               labelText: 'Phone Number',
               hintText: 'Enter 10-digit phone number',
@@ -201,7 +287,7 @@ class _CustomerRegistrationFormState extends State<CustomerRegistrationForm> {
           TextFormField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
-            enabled: !_isLoading,
+            enabled: !_isLoading && !_isOtpSent,
             decoration: const InputDecoration(
               labelText: 'Email Address',
               hintText: 'Enter your email',
@@ -223,7 +309,7 @@ class _CustomerRegistrationFormState extends State<CustomerRegistrationForm> {
           // GST Number Field
           TextFormField(
             controller: _gstController,
-            enabled: !_isLoading,
+            enabled: !_isLoading && !_isOtpSent,
             decoration: const InputDecoration(
               labelText: 'GST Number',
               hintText: 'Enter GST number (optional)',
@@ -242,19 +328,57 @@ class _CustomerRegistrationFormState extends State<CustomerRegistrationForm> {
           ),
           const SizedBox(height: 16),
 
-          // OTP Field (if user has it)
-          TextFormField(
-            controller: _otpController,
-            keyboardType: TextInputType.number,
-            enabled: !_isLoading,
-            decoration: const InputDecoration(
-              labelText: 'OTP (if received)',
-              hintText: 'Enter 6-digit OTP',
-              prefixIcon: Icon(Icons.lock),
-              border: OutlineInputBorder(),
+          // Send OTP Button (shown only before OTP is sent)
+          if (!_isOtpSent) ...[
+            ElevatedButton(
+              onPressed: _isLoading ? null : _sendOtp,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryRed,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Send OTP'),
             ),
-            maxLength: 6,
-          ),
+            const SizedBox(height: 16),
+          ],
+
+          // OTP Field (shown only after OTP is sent)
+          if (_isOtpSent) ...[
+            TextFormField(
+              controller: _otpController,
+              keyboardType: TextInputType.number,
+              enabled: !_isLoading,
+              decoration: const InputDecoration(
+                labelText: 'OTP',
+                hintText: 'Enter 6-digit OTP',
+                prefixIcon: Icon(Icons.lock),
+                border: OutlineInputBorder(),
+              ),
+              maxLength: 6,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter the OTP';
+                }
+                if (value.length != 6) {
+                  return 'OTP must be 6 digits';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
 
           // GST File Upload
           Container(
@@ -296,28 +420,30 @@ class _CustomerRegistrationFormState extends State<CustomerRegistrationForm> {
             const SizedBox(height: 16),
           ],
 
-          // Register Button
-          ElevatedButton(
-            onPressed: _isLoading ? null : _registerCustomer,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryRed,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          // Register Button (shown only after OTP is sent)
+          if (_isOtpSent) ...[
+            ElevatedButton(
+              onPressed: _isLoading ? null : _registerCustomer,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryRed,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Create Account'),
             ),
-            child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Text('Create Account'),
-          ),
+          ],
 
           const SizedBox(height: 16),
           Text(

@@ -44,30 +44,18 @@ class _DriverOrderPageState extends State<DriverOrderPage> {
 
   void verifyPickupOtp() {
     // TODO: Replace with actual OTP verification logic via API
-    if (pickupOtpController.text == '1234') {
-      setState(() => rideStarted = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Pickup OTP Verified. Ride Started.")),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid Pickup OTP")),
-      );
-    }
+    // For now, show message that real OTP validation is required
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("OTP verification requires backend API integration")),
+    );
   }
 
   void verifyDropOtp() {
     // TODO: Replace with actual OTP verification logic via API
-    if (dropOtpController.text == '5678') {
-      setState(() => rideCompleted = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Drop OTP Verified. Ride Completed.")),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid Drop OTP")),
-      );
-    }
+    // For now, show message that real OTP validation is required
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("OTP verification requires backend API integration")),
+    );
   }
 
   void callCustomer() async {

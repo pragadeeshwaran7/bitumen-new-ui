@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../../../core/constants/app_colors.dart';
+import '../../../../../shared/models/tanker_model.dart'; // Updated import
 
 class TankerCard extends StatelessWidget {
-  final Map<String, dynamic> tanker;
+  final TankerModel tanker;
   final String selectedTab;
   final VoidCallback onAssignDriver;
   final VoidCallback onEnable;
@@ -32,14 +33,10 @@ class TankerCard extends StatelessWidget {
         children: [
           _header(),
           const SizedBox(height: 8),
-          _buildRow("Tanker Type", tanker['type']),
-          _buildRow("Max Qty", tanker['maxQty']),
-          _buildRow("Allowed Qty", tanker['allowedQty']),
+          _buildRow("Tanker Type", tanker.tankerType), // Updated field
+          _buildRow("Capacity", tanker.maxCapacity.toStringAsFixed(0)), // Updated field
           const Divider(),
-          _buildRow("RC No", tanker['rcNo']),
-          _buildRow("RC Expiry", tanker['rcExpiry']),
-          _buildRow("Insurance No", tanker['insuranceNo']),
-          _buildRow("Insurance Expiry", tanker['insuranceExpiry']),
+          _buildRow("Registration No", tanker.vehicleNumber), // Updated field
           const Divider(),
           if (selectedTab == "Available Tankers") _availableControls(),
           if (selectedTab == "Disabled Tankers") _disabledControls(),
@@ -53,22 +50,28 @@ class TankerCard extends StatelessWidget {
     Color badgeColor = Colors.grey.shade300;
     Color textColor = Colors.black54;
 
-    if (tanker['status'] == 'Available') {
+    if (tanker.status == 'Idle') { // Changed status
       badgeColor = Colors.green.shade100;
       textColor = AppColors.green;
-    } else if (tanker['status'] == 'In Transit') {
+    } else if (tanker.status == 'In Transit') { // Changed status
       badgeColor = Colors.orange.shade100;
       textColor = AppColors.orange;
+    } else if (tanker.status == 'Under Maintenance') { // Added status
+      badgeColor = Colors.red.shade100;
+      textColor = AppColors.primaryRed;
     }
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(tanker['tankerNo'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(tanker.vehicleNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)), // Updated field
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(color: badgeColor, borderRadius: BorderRadius.circular(16)),
-          child: Text(tanker['status'], style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.bold)),
+          decoration: BoxDecoration(
+            color: badgeColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(tanker.status!, style: TextStyle(color: textColor, fontSize: 12, fontWeight: FontWeight.bold)), // Updated field
         ),
       ],
     );
@@ -85,9 +88,9 @@ class TankerCard extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         ElevatedButton(
-          onPressed: tanker['driverAssigned'] ? null : onAssignDriver,
+          onPressed: onAssignDriver,
           style: ElevatedButton.styleFrom(
-            backgroundColor: tanker['driverAssigned'] ? AppColors.greyText : AppColors.primaryRed,
+            backgroundColor: AppColors.primaryRed,
             foregroundColor: AppColors.white,
           ),
           child: const Text("Assign Driver"),
@@ -114,9 +117,9 @@ class TankerCard extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(tanker['driverName'], style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text(tanker['driverPhone']),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+              Text('Driver: -', style: TextStyle(fontWeight: FontWeight.bold)), // Updated text
+              Text('Phone: -'), // Updated text
             ]),
             IconButton(
               icon: const Icon(Icons.call, color: AppColors.primaryRed),

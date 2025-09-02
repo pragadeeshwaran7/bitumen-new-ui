@@ -21,6 +21,16 @@ class _AddDriverPageState extends State<AddDriverPage> {
   File? licenseFile;
   File? aadharFile;
 
+  @override
+  void dispose() {
+    nameController.dispose();
+    phoneController.dispose();
+    emailController.dispose();
+    licenseController.dispose();
+    aadharController.dispose();
+    super.dispose();
+  }
+
   Future<void> pickLicenseFile() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (picked != null) {
@@ -42,12 +52,22 @@ class _AddDriverPageState extends State<AddDriverPage> {
   Future<void> addDriver() async {
     final driverService = DriverService();
     final driver = DriverModel(
-      driverId: 'driver_${DateTime.now().millisecondsSinceEpoch}',
-      name: nameController.text.trim(),
-      phone: phoneController.text.trim(),
+      fullName: nameController.text.trim(),
+      businessAddress: 'N/A', // Dummy value
+      licenseNumber: licenseController.text.trim(),
+      licenseExpiry: '2025-12-31', // Dummy value
+      vehicleType: 'truck', // Dummy value
+      experience: 0.0, // Dummy value
+      documents: {
+        'aadharCard': aadharController.text.trim(),
+        'drivingLicense': licenseController.text.trim(), // Using license number as driving license document for now
+      },
+      bankDetails: {}, // Dummy empty map
+      phoneNumber: phoneController.text.trim(), // Added phone number
     );
 
     final result = await driverService.createDriver(driver);
+    if (!mounted) return;
     if (result.success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Driver added successfully")),

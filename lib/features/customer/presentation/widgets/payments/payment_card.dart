@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../../../../core/constants/app_colors.dart';
-import 'package:mobile_app/features/customer/data/models/customer_payment.dart';
+import '../../../../../shared/models/order_model.dart'; // Updated import
 
 class PaymentCard extends StatelessWidget {
-  final CustomerPayment payment;
+  final OrderModel payment; // Changed type
 
   const PaymentCard({super.key, required this.payment});
 
   @override
   Widget build(BuildContext context) {
-    Color statusColor = payment.status == 'Pending'
+    Color statusColor = payment.status == 'pending' // Changed status
         ? AppColors.orange
-        : payment.status == 'Completed'
+        : payment.status == 'delivered' // Changed status
             ? AppColors.green
             : AppColors.greyText;
 
@@ -26,18 +26,18 @@ class PaymentCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _paymentHeader(payment.paymentMode, payment.status, statusColor),
+          _paymentHeader(payment.paymentMethod!, payment.status!, statusColor), // Updated fields
           const SizedBox(height: 10),
           Text(
-            payment.amount,
+            "₹${payment.totalAmount?.toStringAsFixed(0)}", // Updated field
             style: const TextStyle(
               fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryRed),
           ),
           const SizedBox(height: 4),
-          Text(payment.date, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+          Text(payment.createdAt!.toLocal().toString().split(" ")[0], style: TextStyle(color: Colors.grey[600], fontSize: 13)), // Updated field
           const SizedBox(height: 8),
-          Text("Order: ${payment.orderId}", style: const TextStyle(fontSize: 13)),
-          Text("Receipt: ${payment.receiptId}", style: const TextStyle(fontSize: 13)),
+          Text("Order: ${payment.id!}", style: const TextStyle(fontSize: 13)), // Updated field
+          // Removed Receipt line
         ],
       ),
     );
@@ -57,7 +57,7 @@ class PaymentCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.1),
+            color: statusColor.withAlpha(25),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Text(
